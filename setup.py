@@ -96,10 +96,12 @@ class UploadCommand(Command):
         os.system('twine upload dist/*')
 
         self.status('Pushing git tags…')
-        os.system('git tag v{0}'.format(about['__version__']))
+        os.system('git commit -a -m v{0}'.format(about['__version__']))
+        os.system('git push')
         # os.system()
-        os.system('git push --tags')
-
+        if 'b' not in about['__version__']:
+            os.system('git tag v{0}'.format(about['__version__']))
+            os.system('git push --tags')
         sys.exit()
 
 
