@@ -6,7 +6,7 @@
 @Desc    : 
 """
 
-__version__ = '0.0.2.beta8'
+__version__ = '0.0.2.beta9'
 
 if __name__ == '__main__':
     pass
