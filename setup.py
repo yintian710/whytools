@@ -1,7 +1,7 @@
-# -*- coding: utf-8 -*-
+# -*- coding: gbk -*-
 """
 @File    : setup.py
-@Date    : 2024/4/15 ä¸‹åˆ7:23
+@Date    : 2024/4/15 ÏÂÎç7:23
 @Author  : yintian
 @Desc    : 
 """
@@ -21,7 +21,7 @@ from ytools import __version__
 
 # Package meta-data.
 NAME = 'why-tools'
-DESCRIPTION = 'ä¸ºä»€ä¹ˆè¿˜è¦ä½¿ç”¨åˆ«çš„å·¥å…·å‘¢ï¼Ÿ'
+DESCRIPTION = 'ÎªÊ²Ã´»¹ÒªÊ¹ÓÃ±ðµÄ¹¤¾ßÄØ£¿'
 URL = 'https://github.com/yintian710/whytools'
 EMAIL = 'yintian710@gmail.com'
 AUTHOR = 'yintian'
@@ -82,20 +82,20 @@ class UploadCommand(Command):
         if len(sys.argv) > 1:
             return
         try:
-            self.status('Removing previous buildsâ€¦')
+            self.status('Removing previous builds¡­')
             rmtree(os.path.join(here, 'dist'))
         except OSError:
             pass
 
-        self.status('Building Source and Wheel (universal) distributionâ€¦')
+        self.status('Building Source and Wheel (universal) distribution¡­')
         os.system('{0} setup.py sdist bdist_wheel --universal'.format(sys.executable))
-        self.status('Building Source and Wheel (universal) distributionâ€¦')
+        self.status('Building Source and Wheel (universal) distribution¡­')
         os.system(f'{sys.executable} setup.py sdist build')
 
-        self.status('Uploading the package to PyPI via Twineâ€¦')
+        self.status('Uploading the package to PyPI via Twine¡­')
         os.system('twine upload dist/*')
 
-        self.status('Pushing git tagsâ€¦')
+        self.status('Pushing git tags¡­')
         os.system('git commit -a -m v{0}'.format(about['__version__']))
         os.system('git push')
         # os.system()
