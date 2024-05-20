@@ -128,9 +128,9 @@ setup(
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,
-    data_files=[
-        ('ytools', ['tpls/*'])
-    ],
+    # data_files=[
+    #     ('ytools', ['tpls/*'])
+    # ],
     license='MIT',
     classifiers=[
         # Trove classifiers
