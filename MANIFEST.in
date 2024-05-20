@@ -1,1 +1,1 @@
-include ytools/tpls/*
+recursive-include ytools/tpls/spider *.tpl
