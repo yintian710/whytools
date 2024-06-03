@@ -5,7 +5,9 @@
 @Author  : yintian
 @Desc    : 
 """
+import atexit
 import os
+import random
 import signal
 import time
 from typing import Callable
@@ -44,17 +46,23 @@ except:  # noqa
 
 def at_exit(func: Callable, *args, **kwargs):
     if kwargs.pop('__always', None):
-        import atexit
         atexit.register(func, *args, **kwargs)
-    Quiter.events.append({
+    key = hash(f'{id(func)}-{time.time()}-{random.Random}')
+    func_dict = {
         'func': func,
         'args': args,
-        'kwargs': kwargs
-    })
+        'kwargs': kwargs,
+        'key': key
+    }
+    Quiter.events.append(func_dict)
+    return key
 
 
-if __name__ == '__main__':
-    at_exit(func=lambda: print(111))
-    while True:
-        logger.debug(os.getpid())
-        time.sleep(5)
+def un_exit(key):
+    events = Quiter.events.copy()
+    for ev in events:
+        if ev['key'] == key:
+            func = ev['func']
+            Quiter.events.remove(ev)
+            atexit.unregister(func)
+            break
