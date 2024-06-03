@@ -11,7 +11,7 @@ from ytools.utils import require
 
 require("arrow==1.3.0", action="fix")
 
-from arrow import Arrow as _Arrow, get as arrow_get
+from arrow import Arrow as _Arrow, get as arrow_get  # noqa
 
 T_FRAMES = Literal[
     "year",

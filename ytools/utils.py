@@ -33,21 +33,35 @@ exec_formatter = better_exceptions.ExceptionFormatter(
 
 PACKAGE_REGEX = re.compile(r"([a-zA-Z0-9_\-]+)([<>=]*)([\d.]*)")
 
+MIRROR_SOURCES = {
+    "TUNA": "https://pypi.tuna.tsinghua.edu.cn/simple",
+    "USTC": "http://pypi.mirrors.ustc.edu.cn/simple/",
+    "Aliyun": "http://mirrors.aliyun.com/pypi/simple/",
+    "Tencent": "https://mirrors.cloud.tencent.com/pypi/simple/",
+    "Huawei": "https://repo.huaweicloud.com/repository/pypi/simple/",
+    "pypi": "https://pypi.org/simple/"
+}
+
 
 def require(
         package_spec: str,
-        action: Literal["raise", "fix"] = "fix"
+        action: Literal["raise", "fix"] = "fix",
+        mirror_sources: Literal["TUNA", "USTC", "Aliyun", "Tencent", "Huawei", "pypi"] = 'TUNA',
 ) -> str:
     """
     依赖 python 包
 
     :param action:
     :param package_spec: pymongo==4.6.0 / pymongo
+    :param mirror_sources :
     :return: 安装的包版本号
     """
+
     # 分离包名和版本规范
     match = PACKAGE_REGEX.match(package_spec)
+    mirror_sources = MIRROR_SOURCES.get(mirror_sources)
     assert match, ValueError("无效的包规范")
+    assert mirror_sources, ValueError("无效的镜像源")
 
     package, operator, required_version = match.groups()
     try:
@@ -61,11 +75,12 @@ def require(
     except importlib_metadata.PackageNotFoundError:
         # 包没有安装或版本不符合要求
         install_command = package_spec if required_version else package
-        cmd = [sys.executable, "-m", "pip", "install", install_command]
+        cmd = [sys.executable, "-m", "pip", "install", "-i", mirror_sources, install_command]
+        cmd_str = ' '.join(cmd)
         if action == "raise":
-            raise importlib_metadata.PackageNotFoundError(f"依赖包不符合要求, 请使用以下命令安装: {' '.join(cmd)}")
+            raise importlib_metadata.PackageNotFoundError(f"依赖包不符合要求, 请使用以下命令安装: {cmd_str}")
         else:
-            logger.debug(f"依赖包不符合要求, 自动修正, 命令: {' '.join(cmd)}")
+            logger.debug(f"依赖包不符合要求, 自动修正, 命令: {cmd_str}")
             subprocess.check_call(cmd)
             return importlib_metadata.version(package)
 
