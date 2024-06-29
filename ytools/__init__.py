@@ -6,7 +6,7 @@
 @Desc    : 
 """
 
-__version__ = '0.0.2.beta14'
+__version__ = '0.0.3'
 
 from ytools.log import logger
 
