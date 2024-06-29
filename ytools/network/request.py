@@ -1,255 +1,166 @@
 # -*- coding: utf-8 -*-
 """
 @File    : request.py
-@Date    : 2024-04-17 13:14
+@Date    : 2024/6/29 下午1:57
 @Author  : yintian
-@Desc    : 
+@Desc    :  Request mode by bricks
 """
-
 import argparse
-import inspect
-import itertools
+import json
 import re
 import shlex
-import threading
+import urllib.parse
 from collections import OrderedDict
-from typing import Optional, Mapping, Any, Union, Callable, Dict
-from urllib import parse
+from http.cookies import SimpleCookie
+from typing import Union, Optional, Dict, List, Callable
 
-import requests
-import ujson
-from six.moves import http_cookies as _cookie  # noqa
-
-from lego.libs import empty
-from lego.libs.models.queues import Item
-from lego.utils import universal
-
-
-class Header(dict):
-
-    def __init__(self, data=None, _dtype: Callable = None, _ktype: Callable = None, **kwargs):
-        self.dtype = _dtype or (lambda x: x)
-        self.ktype = _ktype or str
-        self.comps = [
-            lambda x: str(x).lower(),
-            lambda x: str(x).upper(),
-            lambda x: str(x).title(),
-        ]
-        if data is None:
-            data = {}
-        super().__init__({**data, **kwargs})
-
-    def __setitem__(self, key, value):
-        key: str = self.ktype(key)
-        keys = self.keys()
-
-        for comp in self.comps:
-            nkey = comp(key)
-            if nkey in keys:
-                return super().__setitem__(nkey, self.dtype(value))
-
-        else:
-            return super().__setitem__(key, self.dtype(value))
-
-    def __getitem__(self, key):
-
-        key: str = self.ktype(key)
-        keys = self.keys()
-
-        for comp in self.comps:
-            nkey = comp(key)
-            if nkey in keys:
-                return super().__getitem__(nkey)
-        else:
-            return super().__getitem__(key)
-
-    def __delitem__(self, key):
-        key: str = self.ktype(key)
-        keys = self.keys()
-
-        for comp in self.comps:
-            nkey = comp(key)
-            if nkey in keys:
-                return super().__delitem__(nkey)
-        else:
-            return super().__delitem__(key)
-
-    def __eq__(self, other):
-        if isinstance(other, (Mapping, dict)):
-            other = self.__class__(other, dtype=self.dtype, ktype=self.ktype)
-        else:
-            return NotImplemented
-        # Compare insensitively
-        return self.items() == other.items()
-
-    def __contains__(self, __o: object) -> bool:
-        key: str = self.ktype(__o)
-        keys = self.keys()
-
-        for comp in self.comps:
-            nkey = comp(key)
-            if nkey in keys:
-                return True
-        else:
-            return False
-
-    def setdefault(self, __key, __default):  # noqa
-        key: str = self.ktype(__key)
-        keys = self.keys()
-
-        for comp in self.comps:
-            nkey = comp(key)
-            if nkey in keys:
-                return super().setdefault(nkey, self.dtype(__default))
-        else:
-            return super().setdefault(key, self.dtype(__default))
+from ytools.network.header import Header
 
 
 class Request:
 
     def __init__(
             self,
-            url: str = None,
-            method: str = "get",
-            params: Optional[Mapping[str, str]] = None,
-            data: Any = None,
-            json: Any = None,  # noqa
-            headers: Union[Mapping[str, str]] = None,
-            cookies: Union[Mapping[str, str]] = None,
+            url: str,
+            params: Optional[dict] = None,
+            method: str = 'GET',
+            body: Optional[Union[str, dict]] = None,
+            headers: Union[Header, dict] = None,
+            cookies: Dict[str, str] = None,
+            options: dict = None,
             timeout: int = ...,
             allow_redirects: bool = True,
-            proxies: Optional[Dict[str, str]] = None,
-            verify: Union[bool] = False,
-            cert=None,
-            callback: Callable = empty,
-            spider=empty,
-            httpversion=None,
-            sslversion=None,
-            extra: dict = None,
-            **kwargs
-    ):
+            proxies: Optional[str] = None,
+            proxy: Optional[Union[dict, str, List[Union[dict, str]]]] = None,
+            ok: Optional[Union[str, Dict[str, Union[Callable]]]] = ...,
+            retry: int = 0,
+            max_retry: [int, float] = 5,
+            use_session: bool = False,
+    ) -> None:
         """
-        构造一个 Request
 
-        :param url: 请求相关 URL
-        :param method: 请求方法
-        :param params: 请求参数
-        :param data: 请求 body
-        :param json: 请求 json body
+        :param url: 请求 URL
+        :param params: 请求 URL 参数
+        :param method: 请求方法, 默认 GET
+        :param body: 请求 Body, 支持字典 / 字符串, 传入为字典的时候, 具体编码方式看 headers 里面的 Content-type
+                    # 请求的 body, 全部设置为字典时需要和 headers 配合, 规则如下
+                    # 如果是 json 格式, headers 里面设置 Content-Type 为 application/json
+                    # 如果是 form urlencoded 格式, headers 里面设置 Content-Type 为 application/x-www-form-urlencoded
+                    # 如果是 form data 格式, headers 里面设置 Content-Type 为 multipart/form-data
         :param headers: 请求头
         :param cookies: 请求 cookies
-        :param files: 请求文件
-        :param auth: 验证
-        :param timeout: 超时
+        :param options: 请求其他额外选项, 可以用于配合框架 / 下载器
+        :param timeout: 请求超时时间, 填入 ... 为默认
         :param allow_redirects: 是否允许重定向
-        :param proxies: 请求的代理
-        :param hooks: 请求钩子
-        :param stream: 流
-        :param verify: verify ssl
-        :param cert: 证书
-        :param callback: 回调
-        :param kwargs:
+        :param proxies: 请求代理 Optional[str], 如 http://127.0.0.1:7890, 理解为 current proxy
+        :param proxy: 代理 Key, 理解为 proxy from
+        :param ok: 判断成功动态脚本, 字符串形式, 如通过 403 状态码可以写为: 200 <= response.status_code < 400 or response.status_code == 403
+        :param retry: 当前重试次数
+        :param max_retry: 最大重试次数
+        :param use_session: 是否使用下载器的 session 模式
         """
-
         self.url = url
-        self.method = method.upper()
-        self.params = params or {}
-        self.data = data
-        self.json = json
-        self._headers = Header(headers, _dtype=str)
+        self.use_session = use_session
+        self.params = params
         self.cookies = cookies
+        self.method = method.upper()
+        self.body = body
+        self._headers = Header(headers)
+        self.options = options or {}
         self.timeout = timeout
         self.allow_redirects = allow_redirects
-        self.proxies: Dict[str, str] = proxies
-        self.verify = verify
-        self.cert = cert
-        self.retry = 0
-        self.httpversion = httpversion
-        self.sslversion = sslversion
-        self.max_retry = 5
-        self.res_min_size = None
-        self.pass_code = kwargs.pop("pass_code", ...)
-        self.spider = spider
-        self.callback: Callable = callback
-        self._seeds = Item()
-        self.storage = True
-        self.extra: dict = extra or {}
-
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+        self.proxies = proxies
+        self.proxy: Optional[Union[dict, str, List[Union[dict, str]]]] = proxy
+        self.ok = ok
+        self.retry = retry
+        self.max_retry = max_retry
 
     headers: Header = property(
         fget=lambda self: self._headers,
-        fset=lambda self, v: setattr(self, "_headers", Header(v, _dtype=str)),
-        fdel=lambda self: setattr(self, "_headers", Header({}, _dtype=str)),
+        fset=lambda self, v: setattr(self, "_headers", Header(v)),
+        fdel=lambda self: setattr(self, "_headers", Header({})),
         doc="请求头"
     )
 
     @property
-    def seeds(self) -> Item:
-        return self._seeds
+    def real_url(self):
+        # 解析原始URL
+        parsed_url = urllib.parse.urlparse(self.url)
+        # 提取查询字符串并解析为字典
+        original_params = dict(urllib.parse.parse_qsl(parsed_url.query))
 
-    @seeds.setter
-    def seeds(self, v):
-        self._seeds = Item(v)
+        # 更新原始参数字典
+        original_params.update(self.params or {})
 
-    @seeds.deleter
-    def seeds(self):
-        self._seeds = Item()
+        # 重新构建查询字符串
+        query_string = urllib.parse.urlencode(original_params).replace('+', '%20')
 
-    @property
-    def request(self):
-        """
-        获取 PreparedRequest 对象
+        # 构建新的URL
+        new_url = urllib.parse.urlunparse((
+            parsed_url.scheme,
+            parsed_url.netloc,
+            parsed_url.path,
+            parsed_url.params,
+            query_string,
+            parsed_url.fragment
+        ))
 
-        :return:
-        """
-        p = requests.PreparedRequest()
-        p.prepare(
-            method=self.method.upper(),
-            url=self.url,
-            headers=self.headers,
-            files=self.files,
-            data=self.data or {},
-            json=self.json,
-            params=self.params or {},
-            auth=self.auth,
-            cookies=self.cookies,
-        )
-        return p
+        return new_url
 
     @property
     def curl(self):
-        """
-        request object to curl cmd
+        # 开始构建curl命令
+        parts = ["curl", f"-X {self.method.upper()}"]
 
-        :return:
-        """
+        # 添加请求头
 
-        req = self.request
-        args = [
-            'curl',
-            '-X %s' % req.method
-        ]
+        if self.cookies:
+            cookie_str = "; ".join([f'{k}={v}' for k, v in self.cookies.items()])
+        else:
+            cookie_str = ""
 
-        for k, v in sorted(req.headers.items()):
-            args.append('-H ' + ujson.dumps('{}: {}'.format(k, v), escape_forward_slashes=False))
+        content_type = None
+        if self.headers:
+            for header, value in self.headers.items():
+                if header.lower() == 'cookie':
+                    cookie_str = "; ".join(list(filter(None, [value, cookie_str])))
+                else:
+                    if header.lower() == 'content-type':
+                        content_type = value.lower()
+                    parts.append(f"-H {shlex.quote(f'{header}: {value}')}")
 
-        if req.body:
-            body = req.body.decode() if isinstance(req.body, bytes) else req.body
-            args.append('-d ' + ujson.dumps(body, escape_forward_slashes=False))
+        cookie_str and parts.append(f"-H {shlex.quote(f'Cookie: {cookie_str}')}")
 
-        args.append(ujson.dumps(req.url, escape_forward_slashes=False))
+        # 添加请求体
+        if self.body:
+            if content_type == 'application/json':
+                # JSON格式的请求体
+                json_data = json.dumps(self.body)
+                parts.append(f"-d {shlex.quote(json_data)}")
+            elif content_type == 'application/x-www-form-urlencoded':
+                # URL编码格式的请求体
+                form_data = urllib.parse.urlencode(self.body)
+                parts.append(f"--data {shlex.quote(form_data)}")
+            else:
+                if isinstance(self.body, dict):
+                    body_data = urllib.parse.urlencode(self.body)
+                else:
+                    body_data = self.body
+                # 其他或未知类型，假定为字符串
+                parts.append(f"--data {shlex.quote(body_data)}")
 
-        return ' '.join(args)
+        # 添加URL（包括查询参数）
+        parts.append(shlex.quote(self.real_url))
+
+        # 转换为字符串格式的命令
+        return " ".join(parts)
 
     @classmethod
-    def from_curl(cls, curl_command, **kwargs):
+    def from_curl(cls, curl_command):
         """
         从 curl 中导入
 
         :param curl_command:
-        :param kwargs:
         :return:
         """
 
@@ -291,7 +202,7 @@ class Request:
 
         cookie_dict = OrderedDict()
         if parsed_args.cookie:
-            cookie = _cookie.SimpleCookie(bytes(parsed_args.cookie, "ascii").decode("unicode-escape"))
+            cookie = SimpleCookie(bytes(parsed_args.cookie, "ascii").decode("unicode-escape"))
             for key in cookie:
                 cookie_dict[key] = cookie[key].value
 
@@ -305,233 +216,75 @@ class Request:
                 header_key, header_value = curl_header.split(":", 1) if ':' in curl_header else (curl_header, "")
 
             if header_key.lower().strip("$") == 'cookie':
-                cookie = _cookie.SimpleCookie(bytes(header_value, "ascii").decode("unicode-escape"))
+                cookie = SimpleCookie(bytes(header_value, "ascii").decode("unicode-escape"))
                 for key in cookie:
                     cookie_dict[key] = cookie[key].value
             else:
-                quoted_headers[header_key] = header_value.strip()
+                quoted_headers[header_key] = str(header_value).strip()
 
-        # add auth
-        user = parsed_args.user
-        if parsed_args.user:
-            user = tuple(user.split(':'))
+        # 解析原始URL
+        parsed_url = urllib.parse.urlparse(parsed_args.url)
+        # 提取查询字符串并解析为字典
+        params = dict(urllib.parse.parse_qsl(parsed_url.query))
 
         return cls(
-            url=parsed_args.url,
-            params=kwargs,
+            url=parsed_url.scheme + "://" + parsed_url.netloc + parsed_url.path,
+            params=params,
             method=method,
-            data=post_data,
+            body=post_data,
             headers=quoted_headers,
             cookies=cookie_dict,
-            auth=user,
-            verify=parsed_args.insecure
         )
 
-    @property
-    def real_url(self):
-        """
-        带有参数的真实请求的 url
+    def put_options(self, key: str, value, action="update"):
+        func = getattr(self.options, action)
+        return func(**{key: value})
 
-        :return:
-        """
-
-        if self.params:
-            scheme, netloc, path, params, query, fragment = parse.urlparse(self.url)
-            query = "&".join([query, parse.urlencode(self.params)]) if query else parse.urlencode(self.params)
-            return parse.urlunparse([scheme, netloc, path, params, query, fragment])
-
-        else:
-            return self.url
-
-    @property
-    def proxies_or_thread(self):
-        """
-        返回代理或者线程信息
-
-        :return: the name of the agent or thread being used
-        """
-        proxies = self.proxies or {}
-        keys = ['http', 'https', 'sock5']
-
-        for key in keys:
-            _ret = proxies.get(key)
-            if _ret: return _ret
-        else:
-            return threading.current_thread().name
-
-    def clear_proxies(self):
-        from lego.utils.proxies import proxy_manager
-        self.proxies = None
-        proxy_manager.clear_proxies(self.proxies_key)
-
-    def success(self):
-        """
-        将请求标记为成功状态，删除备份临时种子等信息
-
-        :return:
-        """
-        return self.spider.remove_seeds(self.seeds)
-
-    def submit(self, limit=False):
-        """
-        将请求提交到待处理队列
-
-        :return:
-        """
-        self.spider.submit(self, limit=limit)
-        return self.to_task_queue("temp")
-
-    def to_task_queue(self, qt='current', **kwargs):
-        """
-        save to task queue
-
-        :return:
-        """
-
-        if not self.seeds:
-            return False
-        else:
-            return self.spider.put_seeds(seeds=self.seeds, maxsize=None, qtypes=qt, **kwargs)
-
-    def to_response(self, hooks: object = "default", retry=0, downloader=None):
-        """
-        发送请求获取响应对象，可以执行钩子
-
-        :param retry:
-        :param hooks: hooks
-        :param downloader:
-        :return:
-        :rtype: Response
-        """
-        from lego.libs.network import Response
-        from lego.core.downloader import RequestsDownloader
-
-        if hooks == 'default':
-            from lego.packages.before_request import random_ua, set_proxies
-            from lego.packages.after_request import show_response
-
-            hooks = {
-                "before": [random_ua, set_proxies],
-                "after": [show_response]
-            }
-
-        elif hooks is True:
-            hooks = {
-                'before': universal.iterable(self.before_request or []),
-                'after': universal.iterable(self.after_request or []),
-            }
-
-        if retry != -1:
-            ditto = range(retry + 1)
-        else:
-            ditto = itertools.count()
-
-        response = Response.make_response(status_code=-1)
-        downloader = downloader or RequestsDownloader()
-        if inspect.isclass(downloader): downloader = downloader()
-
-        assert not inspect.iscoroutinefunction(downloader.fetch), f"该模式不支持异步下载器: {downloader}"
-
-        for _ in ditto:
-
-            response: Response = downloader.fetch(self, hooks=hooks)
-            if not response:
-                self.retry += 1
-                self.clear_proxies()
-            else:
-                break
-
-        return response  # type:Response
-
-    def replace(self, **kwargs):
-        """
-        替换请求的某些属性后生成一个新的 Request
-
-        :param kwargs:
-        :return:
-        """
-        attrs = {**self.__dict__}
-        attrs.update(**kwargs)
-        return self.__class__(**attrs)
-
-    def follow(self, seeds: dict, backup: list = None, shutdown=False, attrs: dict = None):
-        """
-        根据种子 `seeds` 重新渲染 生成新的 request
-        并拷贝 当前 request 的 attrs 至 新的 request
-        默认拷贝 seeds.raw, 并设置 _follow
-
-        :param seeds: 新的种子
-        :param backup: 需要备份的属性
-        :param shutdown: 是否终止当前流程
-        :param attrs: 需要设置的属性
-        :return:
-        """
-        return self.spider.follow(self, seeds=seeds, backup=backup, shutdown=shutdown, attrs=attrs)
-
-    def __getattr__(self, item):
-        if item == 'callback': item = 'parse'
-        return getattr(self.spider, item, empty)
-
-    def __getitem__(self, item):
-        if isinstance(item, tuple):
-            item, default = item
-
-        elif isinstance(item, list):
-            return tuple([self.seeds.get(*universal.iterable(_i)) for _i in item])
-        else:
-            item, default = item, None
-
-        return self.seeds.get(item, default)
-
-    def __setitem__(self, key, value):
-        self.seeds[key] = value
-
-    def __delitem__(self, key):
-        for _k in universal.iterable(key):
-            self.seeds.pop(_k, None)
+    def get_options(self, key: str, default=None, action="get"):
+        func = getattr(self.options, action)
+        return func(key, default)
 
     def __str__(self):
         return f'<Request [{self.real_url}]>'
 
-    def __repr__(self):
-        return self.__str__()
-
-    def __bool__(self):
-        return bool(self.real_url)
-
-    def from_cookies(self):
-        cookies = self.headers.get("Cookie")
-        if not cookies:
-            return []
-        else:
-            up = parse.urlparse(self.url)
-            return [
-                dict(zip(
-                    (
-                        "name",
-                        "value",
-                        "domain",
-                        "path",
-                    ),
-                    (
-                        *i.split("="),
-                        up.netloc,
-                        "/"
-                    )
-                )) for i in cookies.split("; ")
-            ]
+    __repr__ = __str__
 
 
 if __name__ == '__main__':
-    req = Request.from_curl("""
+    # req = Request(
+    #     url="https://example.com/path",
+    #     params={"query": "value"},
+    #     method="POST",
+    #     body="key=value",
+    #     # headers={"Content-Type": "application/json"}
+    # )
+    # print(req.curl)
+    req = Request.from_curl(
+        """
+       curl --location 'https://api.m.jd.com/api' \
+--header 'Host: api.m.jd.com' \
+--header 'Connection: keep-alive' \
+--header 'X-Referer-Page: /pages/product/product' \
+--header 'xweb_xhr: 1' \
+--header 'X-Rp-Client: mini_2.0.0' \
+--header 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 MicroMessenger/6.8.0(0x16080000) NetType/WIFI MiniProgramEnv/Mac MacWechat/WMPF MacWechat/3.8.5(0x1308050b)XWEB/31023' \
+--header 'X-Referer-Package: wx862d8e26109609cb' \
+--header 'Accept: */*' \
+--header 'Sec-Fetch-Site: cross-site' \
+--header 'Sec-Fetch-Mode: cors' \
+--header 'Sec-Fetch-Dest: empty' \
+--header 'Referer: https://servicewechat.com/wx862d8e26109609cb/134/page-frame.html' \
+--header 'Accept-Language: zh-CN,zh;q=0.9' \
+--header 'Content-Type: application/x-www-form-urlencoded' \
+--data-urlencode 'appid=jd_healthy' \
+--data-urlencode 'functionId=jdh_mini_viewHealthy' \
+--data-urlencode 'body={"t":"1699945509078","fromType":"wxapp","apolloId":"0bffab44e51a45dd9abba25bb1a837d4","apolloSecret":"63776250363d4f58be246942e1d7dffc","clientVersion":"6.0.0","moudleId":"product","source":7,"wareId":"10035789319416","pageParams":{"wareId":"10032049399319"}}' \
+--data-urlencode 'client=jdh_android' \
+--data-urlencode 'clientVersion=191' \
+--data-urlencode 'uuid=c916c23b-3f47-44df-9676-991a4572d9b7' \
+--data-urlencode 'h5st=20231114150509103;39nitmmzz55zz5t9;3c4d4;tk03a89ae1bce18pMngxKzF4M3gx-8IEi7HovD4yyS7t9CS44Pf87FKEDnwhVM_flAfOnMwpsj0nCM527xQUv_NvUQIs;7169fa348bca9b8d1a2f69abcbe9a69c;4.1;1699945509103;275420328beca586eb4d58ea10bc056f1633a9c9f91541c365a5c67afa45389b1b104ca161b54546027decda1169ec06e8acaf7230ba14f851bd4921d74e865e63ccb34bc0b1c584632a2e22048ed0158b238cf99ee17e8a7bde6196c7a66692' \
+--data-urlencode 'x-api-eid-token=jdd01w49LHCK5MMEEHEICAQSQJG7A5GGN6I3JZ3QOV5JYACPJPDQ5VWLWCTG3LJZW2LZOE336QNRLTNC6FOMNDCWIEUDXRD6VN2H2BPKLEACLMCUVOPELA5XV2DMG3GWB6MPTYIT'
+        """
+    )
 
-   curl -X 'GET' \
-  'http://10.0.0.36:5522/clash/api/get_sub' \
-  -H 'accept: application/json'
-    """)
-
-    res = req.to_response()
-    print(res.text)
-
-if __name__ == '__main__':
-    pass
+    print(req.curl)
