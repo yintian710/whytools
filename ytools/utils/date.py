@@ -7,7 +7,7 @@
 """
 from typing import Literal
 
-from ytools.utils import require
+from ytools.utils.magic import require
 
 require("arrow==1.3.0", action="fix")
 

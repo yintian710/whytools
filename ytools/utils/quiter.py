@@ -7,12 +7,11 @@
 """
 import atexit
 import os
-import random
 import signal
-import time
 from typing import Callable
 
 from ytools.log import logger
+from ytools.utils.magic import make_origin, result
 
 
 class Quiter:
@@ -31,7 +30,11 @@ class Quiter:
         while cls.events:
             ev = cls.events.pop()
             try:
-                ev['func'](*ev['args'], **ev['kwargs'])
+                result(
+                    ev['func'],
+                    args=ev['args'],
+                    kwargs=ev['kwargs']
+                )
             except:  # noqa
                 pass
 
@@ -47,15 +50,15 @@ except:  # noqa
 def at_exit(func: Callable, *args, **kwargs):
     if kwargs.pop('__always', None):
         atexit.register(func, *args, **kwargs)
-    key = hash(f'{id(func)}-{time.time()}-{random.Random}')
+    origin = make_origin(func)
     func_dict = {
         'func': func,
         'args': args,
         'kwargs': kwargs,
-        'key': key
+        'key': origin
     }
     Quiter.events.append(func_dict)
-    return key
+    return origin
 
 
 def un_exit(key):

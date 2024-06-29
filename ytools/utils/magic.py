@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@File    : utils.py
+@File    : magic.py
 @Date    : 2024/4/16 下午8:17
 @Author  : yintian
 @Desc    : 
@@ -31,7 +31,7 @@ exec_formatter = better_exceptions.ExceptionFormatter(
     cap_char=better_exceptions.CAP_CHAR
 )
 
-PACKAGE_REGEX = re.compile(r"([a-zA-Z0-9_\-]+)([<>=]*)([\d.]*)")
+PACKAGE_REGEX = re.compile(r"([a-zA-Z0-9_\-]+)([<>=]*)(.*)")
 
 MIRROR_SOURCES = {
     "TUNA": "https://pypi.tuna.tsinghua.edu.cn/simple",
@@ -68,7 +68,10 @@ def require(
         # 获取已安装的包版本
         installed_version = importlib_metadata.version(package)
         # 检查是否需要安装或更新
-        if required_version and not eval(f'{installed_version!r} {operator} {required_version!r}'):
+
+        from ytools.utils.pakeage import parse as version_parse  # noqa
+        if required_version and not eval(
+                f'version_parse({installed_version!r}) {operator} version_parse({required_version!r})'):
             raise importlib_metadata.PackageNotFoundError
         else:
             return installed_version
@@ -326,6 +329,17 @@ def single(_object, default=None):
     return next((i for i in iterable(_object)), default)
 
 
+def first(_object, default=None):
+    """
+    将元素变为可迭代对象后, 获取其第一个元素
+
+    :param _object:
+    :param default:
+    :return:
+    """
+    return next((i for i in iterable(_object)), default)
+
+
 def guess(_object: Any) -> Any:
     """
     智能的转换类型
@@ -413,5 +427,13 @@ def fmt_stack(e: Exception):
     return "".join(list(exec_formatter.format_exception(e.__class__, e, sys.exc_info()[2])))
 
 
+def make_origin(*obj: Any):
+    from time import time
+    from random import random
+    from hashlib import md5
+    id_str = '-'.join([str(id(_)) for _ in obj])
+    return md5(f'{id_str}-{time()}-{random()}'.encode()).hexdigest()
+
+
 if __name__ == '__main__':
-    pass
+    require('curl-cffi>=0.5.10', action='raise')
