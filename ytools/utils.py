@@ -33,7 +33,9 @@ exec_formatter = better_exceptions.ExceptionFormatter(
 
 PACKAGE_REGEX = re.compile(r"([a-zA-Z0-9_\-]+)([<>=]*)([\d.]*)")
 
-MIRROR_SOURCES = {
+# 一般而言, 是一个以 simple 结尾的 url
+PIPY_REGEX = re.compile(r"https?://.*/simple/?$")
+PYPI_MIRROR = {
     "TUNA": "https://pypi.tuna.tsinghua.edu.cn/simple",
     "USTC": "http://pypi.mirrors.ustc.edu.cn/simple/",
     "Aliyun": "http://mirrors.aliyun.com/pypi/simple/",
@@ -46,22 +48,28 @@ MIRROR_SOURCES = {
 def require(
         package_spec: str,
         action: Literal["raise", "fix"] = "fix",
-        mirror_sources: Literal["TUNA", "USTC", "Aliyun", "Tencent", "Huawei", "pypi"] = 'TUNA',
+        mirror_sources: str = "TUNA",
+        pip_kwargs: dict = None
 ) -> str:
     """
     依赖 python 包
 
     :param action:
     :param package_spec: pymongo==4.6.0 / pymongo
-    :param mirror_sources :
+    :param mirror_sources : pip 源, 内置有 "TUNA", "USTC", "Aliyun", "Tencent", "Huawei", "pypi", 可以传自己的源进来
+    :param pip_kwargs: pip 的一些参数, 如 --trusted-host, 单独的参数可以使用 {"--upgrade": ""} 这种方式
+
     :return: 安装的包版本号
     """
 
     # 分离包名和版本规范
     match = PACKAGE_REGEX.match(package_spec)
-    mirror_sources = MIRROR_SOURCES.get(mirror_sources)
+    mirror_sources = PYPI_MIRROR.get(mirror_sources, mirror_sources)
+    pip_kwargs = pip_kwargs or {}
+
     assert match, ValueError("无效的包规范")
-    assert mirror_sources, ValueError("无效的镜像源")
+    assert not mirror_sources or PIPY_REGEX.match(mirror_sources), ValueError("无效的镜像源")
+    mirror_sources and pip_kwargs.setdefault('-i', mirror_sources)
 
     package, operator, required_version = match.groups()
     try:
@@ -75,7 +83,11 @@ def require(
     except importlib_metadata.PackageNotFoundError:
         # 包没有安装或版本不符合要求
         install_command = package_spec if required_version else package
-        cmd = [sys.executable, "-m", "pip", "install", "-i", mirror_sources, install_command]
+        cmd = [sys.executable, "-m", "pip", "install"]
+        pip_kwargs[install_command] = ""
+        for k, v in pip_kwargs.items():
+            k and cmd.append(k)
+            v and cmd.append(v)
         cmd_str = ' '.join(cmd)
         if action == "raise":
             raise importlib_metadata.PackageNotFoundError(f"依赖包不符合要求, 请使用以下命令安装: {cmd_str}")
