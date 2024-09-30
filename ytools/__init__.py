@@ -6,7 +6,9 @@
 @Desc    : 
 """
 
-__version__ = '0.0.2.beta14'
+__version__ = '0.0.4b3'
+
+from ytools.log import logger
 
 if __name__ == '__main__':
     pass

@@ -15,7 +15,7 @@ from shutil import rmtree
 
 from setuptools import find_packages, setup, Command
 
-from ytools.file import get_file_read
+from ytools.utils.file import get_file_read
 from ytools.log import logger
 from ytools import __version__
 
