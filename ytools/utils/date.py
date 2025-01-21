@@ -7,6 +7,8 @@
 """
 from typing import Literal
 
+from arrow.constants import DEFAULT_LOCALE
+
 from ytools.utils.magic import require
 
 require("arrow==1.3.0", action="fix")
@@ -81,7 +83,12 @@ class Arrow(_Arrow):
         """
         return self.get(self.ceil(frame))
 
+    def format(
+            self, fmt: str = "YYYY-MM-DD HH:mm:ss", locale: str = DEFAULT_LOCALE
+    ) -> str:
+        return super().format(fmt, locale)
+
 
 if __name__ == '__main__':
     a = Arrow.now()
-    print(a.start("days").start("quarters"))
+    print(a.format())
