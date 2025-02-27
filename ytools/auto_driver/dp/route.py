@@ -328,7 +328,7 @@ class Route:
     def _on_request(cls, request: RouteRequest):
         for p, v in cls._patters.items():
             if re.search(p, request.url):
-                for func in v.get('on_request'):
+                for func in v.get('on_request', []):
                     cls.mock_func(
                         func=func,
                         request=request
@@ -342,7 +342,7 @@ class Route:
     def _on_response(cls, request: RouteRequest, response: RouteResponse):
         for p, v in cls._patters.items():
             if re.search(p, response.url):
-                for func in v.get('on_response'):
+                for func in v.get('on_response', []):
                     cls.mock_func(
                         func=func,
                         request=request,
