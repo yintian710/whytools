@@ -268,11 +268,12 @@ class Route:
     @staticmethod
     def mock_func(func, *args, **kwargs):
         def inner(**k):
-            kwargs.update(k or {})
+            _kwargs = kwargs.copy()
+            _kwargs.update(k or {})
             return result(
                 func=func,
                 args=args,
-                kwargs=kwargs,
+                kwargs=_kwargs,
             )
 
         return inner
@@ -370,11 +371,15 @@ def mock_res(**kwargs):
     # print(kwargs)
 
 
+def mock_baidu(request: RouteRequest):
+    print(request.url)
+
 def test():
     browser = ChromiumPage()
     Route.start_by_driver(driver=browser.driver)
     Route.on('request', 'utils', mock_raw)
     Route.on('response', 'utils', mock_res)
+    # Route.on('response', 'baidu', mock_baidu)
     # browser.get('http://www.baidu.com')
     b = random.randint(0, 10000)
     browser.get(f'http://localhost:5522/utils/raw?a=1&b={b}')
