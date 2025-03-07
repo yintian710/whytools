@@ -7,12 +7,12 @@
 """
 from typing import Literal
 
-from arrow.constants import DEFAULT_LOCALE
 
 from ytools.utils.magic import require
 
 require("arrow==1.3.0", action="fix")
 
+from arrow.constants import DEFAULT_LOCALE  # noqa
 from arrow import Arrow as _Arrow, get as arrow_get  # noqa
 
 T_FRAMES = Literal[
