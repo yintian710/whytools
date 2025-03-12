@@ -6,5 +6,20 @@
 @Desc    : 
 """
 
+
+class A:
+    _h = {}
+
+    @property
+    def h(self):
+        return self._h
+
+    @h.setter
+    def h(self, val):
+        print()
+
+
 if __name__ == '__main__':
-    pass
+    a = A()
+    print(a.h)
+    a.h['a'] = 3
