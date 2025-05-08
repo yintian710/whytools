@@ -18,7 +18,8 @@ class CacheItem:
     expire_time: Optional[float] = None
     max_uses: Optional[int] = None
 
-    def __init__(self, cache_id, value: Any, expire_time: Optional[float] = None, max_uses: Optional[int] = None):
+    def __init__(self, cache_id, value: Any, expire_time: Optional[float] = None, max_uses: Optional[int] = None, is_empty=False):
+        self.is_empty = is_empty
         self.id = cache_id
         self.value = value
         self.set_expire_time(expire_time)
@@ -26,6 +27,9 @@ class CacheItem:
         self._use_count = count()
         self.use_count = next(self._use_count)
         self.create_time = time.time()
+
+    def __bool__(self):
+        return self.is_empty is not None
 
     def use(self):
         self.use_count = next(self._use_count)
@@ -79,7 +83,8 @@ class CacheManager(dict):
         self._lock = threading.Lock()
 
     def __setitem__(self, key: str, value: Any) -> None:
-        """重写字典的设置方法，默认无过期时间和使用次数限制"""
+        """重写字典的设置方法，设置默认过期时间和使用次数限制"""
+        key = str(key)
         with self._lock:
             if isinstance(value, CacheItem):
                 super().__setitem__(key, value)
@@ -89,13 +94,14 @@ class CacheManager(dict):
     def __getitem__(self, key: str) -> CacheItem:
         """重写字典的获取方法，增加过期和使用次数检查"""
         with self._lock:
+            key = str(key)
             if key not in self:
-                return CacheItem(None, None)
+                return CacheItem(None, None, is_empty=True)
 
             cache_item: CacheItem = super().__getitem__(key)
             if not cache_item.can_use():
                 del self[key]
-                return CacheItem(None, None)
+                return CacheItem(None, None, is_empty=True)
 
             cache_item.use()
             return cache_item
@@ -133,6 +139,7 @@ if __name__ == '__main__':
     cm = CacheManager()
     cm['1'] = 3
     cm.set_expire('1', 6, 10)
+    cm.pop('1', None)
     for i in range(10):
         print(cm['1'].value)
         time.sleep(1)
