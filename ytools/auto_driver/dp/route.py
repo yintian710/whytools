@@ -5,6 +5,8 @@
 @Author  : yintian
 @Desc    : 
 """
+from DrissionPage._configs.chromium_options import ChromiumOptions
+
 from ytools.utils.magic import require
 
 require('DrissionPage>=4.0.5.6')
@@ -19,7 +21,6 @@ from hashlib import md5
 
 from DrissionPage._base.driver import Driver  # noqa
 from DrissionPage._pages.chromium_page import ChromiumPage  # noqa
-from loguru import logger
 
 from ytools.utils.magic import result
 
@@ -69,6 +70,7 @@ class RouteRequest:
         self.options = kwargs.copy()
         self.options.pop('driver', None)
         self.raw_fingerprint = self.fingerprint
+        self.response_headers = {}
         self.raw_data = self.continue_data.copy()
 
     @property
@@ -91,7 +93,15 @@ class RouteRequest:
             headers=self.headers,
         )
         if self.response:
-            data['rawResponse'] = base64.b64encode(self.response.encode()).decode()
+            body = ['HTTP/2.0 200 OK']
+            for k, v in self.response_headers.items():
+                body.append(f'{k}: {v}')
+            body.append(f"Content-Length: {len(self.response)}")
+            body.append('')
+            body.append(self.response)
+            response = '\r\n'.join(body)
+            # body.append(base64.b64encode(self.response.encode()).decode())
+            data['rawResponse'] = base64.b64encode(response.encode()).decode()
         if self.error:
             if self.error not in ['Failed', 'Aborted', 'TimedOut', 'AccessDenied', 'ConnectionClosed',
                                   'ConnectionReset', 'ConnectionRefused', 'ConnectionAborted', 'ConnectionFailed',
@@ -149,6 +159,7 @@ class RouteResponse:
         self.url = self.request.url
         self.raw_fingerprint = self.fingerprint
         self.raw_data = self.continue_data.copy()
+        self.headers = {}
         self.get_response_body()
 
     def get_response_body(self):
@@ -200,7 +211,25 @@ class RouteResponse:
             headers=self.request.headers,
         )
         if self.flag and self.content:
-            data['rawResponse'] = base64.b64encode(self.content).decode()
+            if self.headers:
+                response_lines = ['HTTP/1.1 200 OK']
+                # 添加默认头部
+                if self.headers:
+                    for key, value in self.headers.items():
+                        response_lines.append(f"{key}: {value}")
+                # 添加 Content-Length
+                response_lines.append(f"Content-Length: {len(self.content)}")
+                # 添加空行分隔头部和正文
+                response_lines.append("")
+                # 添加正文
+                response_lines.append(self.content.decode())
+                # 合并成完整的响应字符串
+                full_response = "\r\n".join(response_lines)
+                data['rawResponse'] = base64.b64encode(full_response.encode()).decode()
+            else:
+                data['rawResponse'] = base64.b64encode(self.content).decode()
+            # if self.headers:
+            #     data['headers'] = self.headers
         if self.error:
             if self.error not in ['Failed', 'Aborted', 'TimedOut', 'AccessDenied', 'ConnectionClosed',
                                   'ConnectionReset', 'ConnectionRefused', 'ConnectionAborted', 'ConnectionFailed',
@@ -356,33 +385,52 @@ class Route:
 
 
 def mock_raw(request: RouteRequest):
-    request.url = 'http://localhost:5522/utils/raw?a=0&b=0'
-    request.response = 'mock success'
+    request.url = 'http://106.55.2.140:5522/utils/raw?a=0&b=0'
+    request.headers['t1'] = "asd"
+    request.response_headers = {
+        'Date': 'Tue, 11 Mar 2025 16:48:03 GMT',
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Custom-Header': 'Test-Value111',
+        'Access-Control-Allow-Origin': '*',  # 处理跨域
+    }
+    request.response = "123"
+    # request.headers = {
+    #     'Content-Type': 'text/plain; charset=utf-8'
+    # }
     # print(kwargs)
     # request.fail_request('')
 
 
 def mock_res(**kwargs):
-    request: RouteRequest = kwargs['request']
     response: RouteResponse = kwargs['response']
-    logger.info(request.extra.resource_type)
-    logger.info(response.text)
-    response.text = '123'
+
+    response.text = 'mock success'
+
+    response.headers = {
+        'Date': 'Tue, 11 Mar 2025 16:48:03 GMT',
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Custom-Header': 'Test-Value111',
+        'Access-Control-Allow-Origin': '*',  # 处理跨域
+    }
     # print(kwargs)
 
 
 def mock_baidu(request: RouteRequest):
     print(request.url)
 
+
 def test():
-    browser = ChromiumPage()
+    opt = ChromiumOptions()
+    opt.set_argument(' --disable-web-security', "")
+    opt.set_browser_path("a")
+    browser = ChromiumPage(opt)
     Route.start_by_driver(driver=browser.driver)
     Route.on('request', 'utils', mock_raw)
     Route.on('response', 'utils', mock_res)
     # Route.on('response', 'baidu', mock_baidu)
     # browser.get('http://www.baidu.com')
     b = random.randint(0, 10000)
-    browser.get(f'http://localhost:5522/utils/raw?a=1&b={b}')
+    browser.get(f'http://106.55.2.140:5522/utils/raw?a=1&b={b}')
     while True:
         time.sleep(1)
 
