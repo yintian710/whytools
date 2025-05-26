@@ -8,6 +8,7 @@
 from ytools.utils import magic
 
 magic.require("w3lib>=2.1.2")
+magic.require("lxml")
 
 import re
 import sys
