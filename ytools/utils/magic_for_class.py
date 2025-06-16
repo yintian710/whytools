@@ -18,16 +18,40 @@ class CustomMeta(type):
         # 获取单例参数和包装前缀
         singleton = kwargs.get('singleton', False)
         wrappers = kwargs.get('wrappers', '_when_')
+        fix = kwargs.get('fix', {})
         # 存储 kwargs 以便 __call__ 使用
-        attrs['__cls_kwargs'] = {'singleton': singleton, 'wrappers': wrappers}
+        attrs['__cls_kwargs'] = {'singleton': singleton, 'wrappers': wrappers, 'fix': fix}
         # 不修改方法，仅创建类
         cls = super().__new__(mcs, name, bases, attrs)
         return cls
 
     def __call__(cls, *args, **kwargs):
         # 获取单例参数和包装前缀
-        singleton = getattr(cls, '__cls_kwargs', {}).get('singleton', False)
-        wrappers = getattr(cls, '__cls_kwargs', {}).get('wrappers', '_when_')
+        cls_kwargs = getattr(cls, '__cls_kwargs', {})
+        singleton = cls_kwargs.get('singleton', False)
+        wrappers = cls_kwargs.get('wrappers', '_when_')
+        fix = cls_kwargs.get('fix', {})
+
+        def when_match(ins, attr_name):
+            attr_value = getattr(ins, attr_name)
+            if not callable(attr_value):
+                return False
+            wrapper_name = f'{wrappers}{attr_name}'
+            wrapper_func = getattr(ins, wrapper_name, None)
+            if wrapper_func and callable(wrapper_func):
+                return True
+            return False
+
+        def when_fix(ins, attr_name):
+            attr_value = getattr(ins, attr_name)
+            wrapper_name = f'{wrappers}{attr_name}'
+            wrapper_func = getattr(ins, wrapper_name)
+            setattr(ins, attr_name, wrapper_func(attr_value))
+
+        fix['when'] = {
+            "match": when_match,
+            "fix": when_fix
+        }
 
         def get_key():
             if isinstance(singleton, str):
@@ -54,13 +78,9 @@ class CustomMeta(type):
         def new_ins():
             ins = type.__call__(cls, *args, **kwargs)
             for attr_name in dir(ins):
-                attr_value = getattr(ins, attr_name)
-                if not callable(attr_value):
-                    continue
-                wrapper_name = f'{wrappers}{attr_name}'
-                wrapper_func = getattr(ins, wrapper_name, None)
-                if wrapper_func and callable(wrapper_func):
-                    setattr(ins, attr_name, wrapper_func(attr_value))
+                for fd in fix.values():
+                    if fd['match'](ins, attr_name):
+                        fd['fix'](ins, attr_name)
             return ins
 
         # 检查单例
@@ -75,31 +95,3 @@ class CustomMeta(type):
             instance = new_ins()
         return instance
 
-
-class When(metaclass=CustomMeta, singleton='all'):
-    def __init__(self, name, **kwargs):
-        self.name = name
-        self.kwargs = kwargs
-
-    def get_name(self):
-        return self.name
-
-    def _when_get_name(self, func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-
-            raw_name = self.name
-            self.name = 'when_' + raw_name
-            try:
-                return func(*args, **kwargs)
-            finally:
-                self.name = raw_name
-
-        return wrapper
-
-
-if __name__ == '__main__':
-    w = When('a', b=3)
-    e = When('b', c=4, b=2, e=w)
-    print(w.get_name())
-    print(e.get_name())

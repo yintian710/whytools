@@ -43,7 +43,7 @@ class Request:
         :param params: 请求 URL 参数
         :param method: 请求方法, 默认 GET
         :param body: 请求 Body, 支持字典 / 字符串, 传入为字典的时候, 具体编码方式看 headers 里面的 Content-type
-                    # 请求的 body, 全部设置为字典时需要和 headers 配合, 规则如下
+                    # 求的 body, 全部设置为字典时需要和 headers 配合, 规则如下请
                     # 如果是 json 格式, headers 里面设置 Content-Type 为 application/json
                     # 如果是 form urlencoded 格式, headers 里面设置 Content-Type 为 application/x-www-form-urlencoded
                     # 如果是 form data 格式, headers 里面设置 Content-Type 为 multipart/form-data
