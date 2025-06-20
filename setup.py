@@ -142,7 +142,8 @@ setup(
         'upload': UploadCommand,
     },
     script_name="setup.py",
-    script_args=["upload"] if len(sys.argv) == 1 else sys.argv[1:]
+    script_args=["upload"] if len(sys.argv) == 1 else sys.argv[1:],
+    keywords=['ytools']
 )
 
 if __name__ == '__main__':
