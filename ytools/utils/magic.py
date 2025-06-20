@@ -13,7 +13,8 @@ import os
 import re
 import subprocess
 import sys
-from typing import Literal, Any, List, Union, Generator, Dict
+from dataclasses import dataclass
+from typing import Literal, Any, List, Union, Generator, Dict, Callable
 from urllib import parse
 
 import better_exceptions
@@ -296,6 +297,29 @@ def result(
             raise e
 
     return _result if to_generator is False else generator(_result, **(to_gen_kwargs or {}))
+
+
+class Prepare:
+    def __init__(self, func: Union[str, Callable], args=None, kwargs=None):
+        if isinstance(func, str):
+            func = load_object(func, strict=True)
+        self.func = func
+        self.args: List = list(args) if args else []
+        self.kwargs: dict = kwargs or {}
+        self.build = self.re_build()
+
+    def set_kwargs(self, key, value, not_exit=True):
+        if not (self.build.get(key) and not_exit):
+            self.kwargs[key] = value
+
+    def re_build(self):
+        sig = inspect.signature(self.func)
+        bind = sig.bind(*self.args, **self.kwargs)
+        self.build = bind.arguments
+        return self.build
+
+    def __call__(self):
+        return result(func=self.func, kwargs=self.build)
 
 
 def iterable(_object: Any, enforce=(dict, str, bytes), exclude=(), convert_null=True) -> List[Any]:
