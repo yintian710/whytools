@@ -309,7 +309,7 @@ class Prepare:
         self.build = self.re_build()
 
     def set_kwargs(self, key, value, force=False):
-        if force or key not in self.build:
+        if force or (key in self.build and self.build.get(key) is None):
             self.kwargs[key] = value
             self.re_build()
 
