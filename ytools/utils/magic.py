@@ -319,8 +319,9 @@ class Prepare:
         self.build = bind.arguments
         return self.build
 
-    def __call__(self):
-        return result(func=self.func, kwargs=self.build)
+    def __call__(self, *args, **kwargs):
+        kwargs.update(self.build)
+        return result(*args, func=self.func, kwargs=self.build, *kwargs)
 
 
 def iterable(_object: Any, enforce=(dict, str, bytes), exclude=(), convert_null=True) -> List[Any]:
