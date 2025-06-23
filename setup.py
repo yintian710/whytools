@@ -17,7 +17,7 @@ from setuptools import find_packages, setup, Command
 
 from ytools.utils.file import get_file_read
 from ytools.log import logger
-from ytools import __version__
+from ytools.version import update_version, save_version
 
 # Package meta-data.
 NAME = 'why-tools'
@@ -26,7 +26,8 @@ URL = 'https://github.com/yintian710/whytools'
 EMAIL = 'yintian710@gmail.com'
 AUTHOR = 'yintian'
 REQUIRES_PYTHON = '>=3.8.0'
-VERSION = __version__
+
+VERSION = update_version(save=False)
 
 # What packages are required for this module to be executed?
 REQUIRED = [
@@ -93,6 +94,7 @@ class UploadCommand(Command):
 
         self.log('Uploading the package to PyPI via Twine¡­')
         os.system('twine upload dist/*')
+        save_version(version=about['__version__'])
 
         self.log('Pushing git tags¡­')
         os.system('git commit -a -m v{0}'.format(about['__version__']))

@@ -6,9 +6,10 @@
 @Desc    : 
 """
 
-__version__ = '0.0.15'
-
 from ytools.log import logger
+from ytools.version import get_version
+
+__version__ = get_version()
 
 if __name__ == '__main__':
     pass
