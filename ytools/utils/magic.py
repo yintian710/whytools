@@ -323,7 +323,6 @@ class Prepare:
         return self.build
 
     def __call__(self, *args, **kwargs):
-        kwargs.update(self.build)
         return result(*args, func=self.func, kwargs=self.build, *kwargs)
 
 
