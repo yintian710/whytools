@@ -311,6 +311,7 @@ class Prepare:
     def set_kwargs(self, key, value, set_default=True):
         if not (self.build.get(key) and set_default):
             self.kwargs[key] = value
+            self.re_build()
 
     def re_build(self):
         sig = inspect.signature(self.func)
