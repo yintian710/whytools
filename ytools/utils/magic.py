@@ -310,13 +310,13 @@ class Prepare:
 
     def set_kwargs(self, key, value, force=False):
         if force or (key in self.build and self.build.get(key) is None):
-            self.kwargs[key] = value
+            self.build[key] = value
             self.re_build()
 
     def re_build(self, rebuild=True):
         sig = inspect.signature(self.func)
         if rebuild:
-            bind = sig.bind(**self.kwargs)
+            bind = sig.bind(**self.build)
         else:
             bind = sig.bind(*self.args, **self.kwargs)
         self.build = bind.arguments
