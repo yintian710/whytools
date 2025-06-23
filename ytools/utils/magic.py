@@ -308,8 +308,8 @@ class Prepare:
         self.kwargs: dict = kwargs or {}
         self.build = self.re_build()
 
-    def set_kwargs(self, key, value, not_exit=True):
-        if not (self.build.get(key) and not_exit):
+    def set_kwargs(self, key, value, set_default=True):
+        if not (self.build.get(key) and set_default):
             self.kwargs[key] = value
 
     def re_build(self):
