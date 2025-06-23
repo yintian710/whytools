@@ -19,8 +19,12 @@ class CustomMeta(type):
         keys = ['singleton', 'wrappers', 'fix']
         # 获取单例参数和包装前缀
         for key in keys:
+            if value := kwargs.get(key):
+                __cls_kwargs[key] = value
+                continue
             for base in bases:
-                if hasattr(base, key) and (value := getattr(base, key)) is not None:
+                cls_kw = hasattr(base, '__cls_kwargs') and (getattr(base, '__cls_kwargs', {}))
+                if cls_kw and (value := cls_kw.get(key)) is not None:
                     __cls_kwargs[key] = value
                     break
         attrs['__cls_kwargs'] = __cls_kwargs

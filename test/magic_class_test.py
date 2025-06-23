@@ -62,7 +62,7 @@ def name_fix(ins, attr_name: str):
     setattr(ins, attr_name, process(ins, attr_value))
 
 
-class Fix(metaclass=CustomMeta, fix={"name": {'match': name_match, 'fix': name_fix}}):
+class Fix(When, fix={"name": {'match': name_match, 'fix': name_fix}}):
     def __init__(self, name, **kwargs):
         self.name = name
         self.kwargs = kwargs
@@ -88,10 +88,18 @@ class Fix(metaclass=CustomMeta, fix={"name": {'match': name_match, 'fix': name_f
         return wrapper
 
 
+class Fix2(Fix, wrappers='_where_'):
+    pass
+
+
 if __name__ == '__main__':
     w = When('a', b=3)
     e = Fix('b', c=4, b=2, e=w)
+    t = Fix2('c', c=4, b=2, e=w)
     print(w.get_name())
     print(e.get_name())
+    print(t.get_name())
     print(e.get_e_name('c'))
+    print(t.get_e_name('d'))
     print(e.get_e_name())
+    print(t.get_e_name())
