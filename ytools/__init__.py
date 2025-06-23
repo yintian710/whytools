@@ -9,7 +9,7 @@
 from ytools.log import logger
 from ytools.version import get_version
 
-__version__ = get_version()
+__version__ = get_version(path=__file__)
 
 if __name__ == '__main__':
     pass

@@ -6,13 +6,13 @@
 @Software: PyCharm
 @Desc    : 
 """
-import re
-from packaging.version import Version
 import os
 
+from packaging.version import Version
 
-def get_version(package='ytools', show=False):
-    this_dir = os.path.dirname(os.path.dirname(__file__))
+
+def get_version(package='ytools', show=False, path=None):
+    this_dir = os.path.dirname(os.path.dirname(path or __file__))
     version_path = os.path.join(this_dir, package, 'VERSION')
     if not os.path.exists(version_path):
         print(f'未找到 VERSION 文件')

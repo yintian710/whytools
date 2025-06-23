@@ -15,12 +15,15 @@ class CustomMeta(type):
     _instances = {}
 
     def __new__(mcs, name, bases, attrs, **kwargs):
+        __cls_kwargs = {'singleton': False, 'wrappers': '_when_', 'fix': {}}
+        keys = ['singleton', 'wrappers', 'fix']
         # 获取单例参数和包装前缀
-        singleton = kwargs.get('singleton', False)
-        wrappers = kwargs.get('wrappers', '_when_')
-        fix = kwargs.get('fix', {})
-        # 存储 kwargs 以便 __call__ 使用
-        attrs['__cls_kwargs'] = {'singleton': singleton, 'wrappers': wrappers, 'fix': fix}
+        for key in keys:
+            for base in bases:
+                if hasattr(base, key) and (value := getattr(base, key)) is not None:
+                    __cls_kwargs[key] = value
+                    break
+        attrs['__cls_kwargs'] = __cls_kwargs
         # 不修改方法，仅创建类
         cls = super().__new__(mcs, name, bases, attrs)
         return cls
@@ -94,4 +97,3 @@ class CustomMeta(type):
         else:
             instance = new_ins()
         return instance
-
