@@ -89,6 +89,9 @@ class TourTree:
     def used(self):
         return self._used
 
+    def __len__(self):
+        return len(self.child)
+
     def __bool__(self):
         return bool(self.root or self.child)
 
@@ -128,8 +131,9 @@ if __name__ == '__main__':
         for child in node.child:
             print_tree(child, level + 1)
 
-
-    count = 0
     for i in r9.tour():
         i(i)
+        if i.id == 5:
+            for _ in range(3):
+                i.add(TourTree(root=rt))
     print_tree(root)
