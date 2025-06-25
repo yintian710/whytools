@@ -45,7 +45,6 @@ class TourTree:
     is_done: bool = False
     callback: Callable = None
     id: int = dataclasses.field(default_factory=lambda: next(tour_id))
-    c = 0
 
     def __setattr__(self, key, value):
         if key == 'child' and value is None:
@@ -80,10 +79,6 @@ class TourTree:
             yield one
             one.done()
             one = one.tour_one()
-
-    def click(self):
-        print(self.id, 'click!')
-        self.c += 1
 
     def __bool__(self):
         return bool(self.root or self.child)
