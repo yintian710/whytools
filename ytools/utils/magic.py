@@ -300,13 +300,15 @@ def result(
 
 
 class Prepare:
-    def __init__(self, func: Union[str, Callable], args=None, kwargs=None):
+    def __init__(self, func: Union[str, Callable], args=None, kwargs=None, annotations=None, namespace=None):
         if isinstance(func, str):
             func = load_object(func, strict=True)
         self.func = func
         self.args: List = list(args) if args else []
         self.kwargs: dict = kwargs or {}
         self.build = self.re_build(rebuild=False)
+        self.annotations = annotations or {}
+        self.namespace = namespace or {}
 
     def set_kwargs(self, key, value, force=False):
         if force or (key in self.build and self.build.get(key) is None):
@@ -323,6 +325,8 @@ class Prepare:
         return self.build
 
     def __call__(self, *args, **kwargs):
+        kwargs.setdefault('annotations', self.annotations)
+        kwargs.setdefault('namespace', self.namespace)
         return result(*args, func=self.func, kwargs=self.build, *kwargs)
 
 
