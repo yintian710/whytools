@@ -45,6 +45,8 @@ class TourTree:
     is_done: bool = False
     callback: Callable = None
     id: int = dataclasses.field(default_factory=lambda: next(tour_id))
+    __used: count = dataclasses.field(default_factory=lambda: count(1))
+    _used = 0
 
     def __setattr__(self, key, value):
         if key == 'child' and value is None:
@@ -80,16 +82,27 @@ class TourTree:
             one.done()
             one = one.tour_one()
 
+    def use(self):
+        self._used = next(self.__used)
+
+    @property
+    def used(self):
+        return self._used
+
     def __bool__(self):
         return bool(self.root or self.child)
 
+    def __call__(self, *args, **kwargs):
+        self.use()
+        return self.root(*args, **kwargs)
+
     def __repr__(self):
-        return f"<{self.__class__.__name__} id:{self.id} root:{self.root} parent:{self.parent.id if self.parent else None}>"
+        return f"<{self.__class__.__name__} id:{self.id} used:{self.used} parent:{self.parent.id if self.parent else None} root:{self.root}>"
 
 
 if __name__ == '__main__':
     # 根节点（id=0）
-    rt = lambda x: x.click()
+    rt = lambda x: print(x)
     root = TourTree(root=rt)
 
     # 第一层子节点（直接挂在根节点下）
@@ -111,12 +124,12 @@ if __name__ == '__main__':
 
 
     def print_tree(node: TourTree, level=0):
-        print(f"{'  ' * level}Node {node.id}-{node.c}-{node.is_done}")
+        print(f"{'  ' * level}Node {node.id}-{node.used}-{node.is_done}")
         for child in node.child:
             print_tree(child, level + 1)
 
 
     count = 0
     for i in r9.tour():
-        i.root(i)
+        i(i)
     print_tree(root)
