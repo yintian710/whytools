@@ -207,12 +207,16 @@ def result(
         kwargs: dict = None,
         strict: bool = True,
         debug: bool = True,
+        annotations: dict = None,
+        namespace: dict = None,
         to_generator: bool = False,
         to_gen_kwargs: dict = None
 ):
     """
     运行一个函数并获取结果, 可以自动修复参数错误, 移除无效参数; 补充缺失参数
 
+    :param annotations:
+    :param namespace:
     :param to_gen_kwargs:
     :param to_generator:
     :param debug:
@@ -224,64 +228,43 @@ def result(
                    - _strict: 是否抛出异常
     :return:
     """
-    if not func:
-        return func
-
-    args = (args and [*args]) or []
-    kwargs = (kwargs and {**kwargs}) or {}
+    func = load_object(func)
+    assert callable(func), ValueError(f'func 必须是可执行的方法, func: {func}')
+    annotations = annotations or {}
+    namespace = namespace or {}
+    args = args or []
+    kwargs = kwargs or {}
+    positional_only = []
+    positional_or_keyword = []
+    var_positional = []
+    keyword_only = {}
+    var_keyword = {}
     try:
-        func = load_object(func)
-    except Exception as e:
-        if isinstance(func, str) and not kwargs and not args:
-            return func
-        else:
-            raise e
+        sig = inspect.signature(func)
+        sig_param = sig.parameters
+        bind = sig.bind_partial(*args, **kwargs)
+        bind_arg = bind.arguments
 
-    _result = None
-
-    try:
-        if callable(func):
-            not inspect.isfunction(func) and kwargs.pop('self', None)
-            try:
-                signatures = inspect.signature(func).parameters
-            except:  # noqa
-                signatures = {}
-
-            if getattr(func, "__module__", None) == 'builtins':
-                try:
-                    _result = func(*args, **kwargs)
-                except TypeError:
-                    _result = func(*args)
-            else:
-                t_args, args, t_kwargs = [], list(args), {}
-                for name, v in signatures.items():
-                    if v.default == v.empty:
-                        v._default = None
-                    if v.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
-                        if args:
-                            t_args.append(args.pop(0))
-                        elif name in kwargs:
-                            t_args.append(kwargs.pop(name))
-                        else:
-                            t_args.append(v.default)
-                    elif v.kind == inspect.Parameter.VAR_POSITIONAL:
-                        t_args.extend(args)
-                    elif v.kind == inspect.Parameter.POSITIONAL_ONLY:
-                        if args:
-                            t_args.append(args.pop(0))
-                        else:
-                            args.append(None)
-                    elif v.kind == inspect.Parameter.KEYWORD_ONLY:
-                        t_kwargs.setdefault(name, kwargs.get(name, v.default))
-
-                    elif v.kind == inspect.Parameter.VAR_KEYWORD:
-                        t_kwargs.update(**kwargs)
-
-                else:
-                    _result = func(*t_args, **t_kwargs)
-
-        else:  # noqa
-            _result = func
+        for key, sig_v in sig_param.items():
+            value = bind_arg.get(key, sig_v.default)
+            if value == sig_v.default:
+                value = namespace.get(key) or annotations.get(sig_v.annotation) or value
+            match sig_v.kind.name:
+                case 'POSITIONAL_ONLY':
+                    positional_only.append(value)
+                case 'POSITIONAL_OR_KEYWORD':
+                    positional_or_keyword.append(value)
+                case 'VAR_POSITIONAL':
+                    value = value if value and value != sig_v.empty else tuple()
+                    var_positional = value
+                case 'KEYWORD_ONLY':
+                    keyword_only[key] = value
+                case 'VAR_KEYWORD':
+                    value = value if value and value != sig_v.empty else {}
+                    var_keyword = value
+            if value == sig_v.empty:
+                raise TypeError(f"缺少参数: {key}, 参数列表: {dict(sig_param)}")
+        _result = func(*positional_only, *positional_or_keyword, *var_positional, **keyword_only, **var_keyword)
     except Exception as e:
         if not strict:
             debug and logger.exception(e)
@@ -292,10 +275,8 @@ def result(
                 a=args,
                 k=kwargs
             )
-
         else:
-            raise e
-
+            raise
     return _result if to_generator is False else generator(_result, **(to_gen_kwargs or {}))
 
 
