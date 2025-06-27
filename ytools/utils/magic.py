@@ -300,8 +300,8 @@ class Prepare:
             self.namespace[key] = value
 
     def __call__(self, *args, **kwargs):
-        kwargs.setdefault('annotations', self.annotations)
-        kwargs.setdefault('namespace', self.namespace)
+        kwargs['namespace'] = {**self.namespace, **kwargs.get('namespace', {})}
+        kwargs['annotations'] = {**self.annotations, **kwargs.get('annotations', {})}
         return result(self.func, *args, args=self.args, kwargs=self.kwargs, **kwargs)
 
 
