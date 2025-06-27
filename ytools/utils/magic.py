@@ -287,28 +287,22 @@ class Prepare:
         self.func = func
         self.args: List = list(args) if args else []
         self.kwargs: dict = kwargs or {}
-        self.build = self.re_build(rebuild=False)
+        self.parameters = inspect.signature(self.func).parameters
         self.annotations = annotations or {}
         self.namespace = namespace or {}
 
     def set_kwargs(self, key, value, force=False):
-        if force or (key in self.build and self.build.get(key) is None):
-            self.build[key] = value
-            self.re_build()
-
-    def re_build(self, rebuild=True):
-        sig = inspect.signature(self.func)
-        if rebuild:
-            bind = sig.bind(**self.build)
+        if not self.parameters.get(key):
+            return
+        if force:
+            self.kwargs[key] = value
         else:
-            bind = sig.bind(*self.args, **self.kwargs)
-        self.build = bind.arguments
-        return self.build
+            self.namespace[key] = value
 
     def __call__(self, *args, **kwargs):
         kwargs.setdefault('annotations', self.annotations)
         kwargs.setdefault('namespace', self.namespace)
-        return result(*args, func=self.func, kwargs=self.build, *kwargs)
+        return result(self.func, *args, args=self.args, kwargs=self.kwargs, **kwargs)
 
 
 def iterable(_object: Any, enforce=(dict, str, bytes), exclude=(), convert_null=True) -> List[Any]:
