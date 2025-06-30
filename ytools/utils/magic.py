@@ -220,10 +220,18 @@ class Prepare:
         else:
             self.namespace[key] = value
 
-    def __call__(self, *args, **kwargs):
+    def re_build(self, *args, **kwargs):
         kwargs['namespace'] = {**self.namespace, **kwargs.get('namespace', {})}
         kwargs['annotations'] = {**self.annotations, **kwargs.get('annotations', {})}
-        return result(self.func, *args, args=self.args, kwargs=self.kwargs, **kwargs)
+        pre = prepare(self.func, *self.args, *args, **kwargs)
+        self.__dict__ = pre.__dict__
+
+    def __call__(self, *args, **kwargs):
+        (args or kwargs) and self.re_build(*args, **kwargs)
+        return self.func(*self.args, **self.kwargs)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} func: {self.func}>"
 
 
 def prepare(
@@ -301,6 +309,8 @@ def result(
     :return:
     """
     func = load_object(func)
+    args = args or tuple()
+    kwargs = kwargs or {}
     assert callable(func), ValueError(f'func 必须是可执行的方法, func: {func}')
     try:
         pre = prepare(func, *args, **kwargs, namespace=namespace, annotations=annotations)
