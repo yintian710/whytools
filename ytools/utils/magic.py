@@ -201,6 +201,78 @@ def load_object(path, reload=False, from_path=False, strict=True, __env__=None):
                 return ret
 
 
+class Prepare:
+    def __init__(self, func: Union[str, Callable], args=None, kwargs=None, annotations=None, namespace=None):
+        if isinstance(func, str):
+            func = load_object(func, strict=True)
+        self.func = func
+        self.args: List = list(args) if args else []
+        self.kwargs: dict = kwargs or {}
+        self.parameters = inspect.signature(self.func).parameters
+        self.annotations = annotations or {}
+        self.namespace = namespace or {}
+
+    def set_kwargs(self, key, value, force=False):
+        if not self.parameters.get(key):
+            return
+        if force:
+            self.kwargs[key] = value
+        else:
+            self.namespace[key] = value
+
+    def __call__(self, *args, **kwargs):
+        kwargs['namespace'] = {**self.namespace, **kwargs.get('namespace', {})}
+        kwargs['annotations'] = {**self.annotations, **kwargs.get('annotations', {})}
+        return result(self.func, *args, args=self.args, kwargs=self.kwargs, **kwargs)
+
+
+def prepare(
+        func: Callable,
+        *args,
+        annotations: dict = None,
+        namespace: dict = None,
+        **kwargs,
+) -> Prepare:
+    annotations = annotations or {}
+    namespace = namespace or {}
+    args = args or []
+    kwargs = kwargs or {}
+    positional_only = []
+    positional_or_keyword = []
+    var_positional = []
+    keyword_only = {}
+    var_keyword = {}
+    sig = inspect.signature(func)
+    sig_param = sig.parameters
+    bind = sig.bind_partial(*args, **kwargs)
+    bind_arg = bind.arguments
+
+    for key, sig_v in sig_param.items():
+        value = bind_arg.get(key, sig_v.default)
+        if value == sig_v.default:
+            value = namespace.get(key) or annotations.get(sig_v.annotation) or value
+        match sig_v.kind.name:
+            case 'POSITIONAL_ONLY':
+                positional_only.append(value)
+            case 'POSITIONAL_OR_KEYWORD':
+                positional_or_keyword.append(value)
+            case 'VAR_POSITIONAL':
+                value = value if value and value != sig_v.empty else tuple()
+                var_positional = value
+            case 'KEYWORD_ONLY':
+                keyword_only[key] = value
+            case 'VAR_KEYWORD':
+                value = value if value and value != sig_v.empty else {}
+                var_keyword = value
+        if value == sig_v.empty:
+            raise TypeError(f"缺少参数: {key}, 参数列表: {dict(sig_param)}")
+    return Prepare(
+        func=func,
+        args=(*positional_only, *positional_or_keyword, *var_positional),
+        kwargs={**keyword_only, **var_keyword}
+    )
+
+
 def result(
         func,
         args: Union[list, tuple] = None,
@@ -230,41 +302,9 @@ def result(
     """
     func = load_object(func)
     assert callable(func), ValueError(f'func 必须是可执行的方法, func: {func}')
-    annotations = annotations or {}
-    namespace = namespace or {}
-    args = args or []
-    kwargs = kwargs or {}
-    positional_only = []
-    positional_or_keyword = []
-    var_positional = []
-    keyword_only = {}
-    var_keyword = {}
     try:
-        sig = inspect.signature(func)
-        sig_param = sig.parameters
-        bind = sig.bind_partial(*args, **kwargs)
-        bind_arg = bind.arguments
-
-        for key, sig_v in sig_param.items():
-            value = bind_arg.get(key, sig_v.default)
-            if value == sig_v.default:
-                value = namespace.get(key) or annotations.get(sig_v.annotation) or value
-            match sig_v.kind.name:
-                case 'POSITIONAL_ONLY':
-                    positional_only.append(value)
-                case 'POSITIONAL_OR_KEYWORD':
-                    positional_or_keyword.append(value)
-                case 'VAR_POSITIONAL':
-                    value = value if value and value != sig_v.empty else tuple()
-                    var_positional = value
-                case 'KEYWORD_ONLY':
-                    keyword_only[key] = value
-                case 'VAR_KEYWORD':
-                    value = value if value and value != sig_v.empty else {}
-                    var_keyword = value
-            if value == sig_v.empty:
-                raise TypeError(f"缺少参数: {key}, 参数列表: {dict(sig_param)}")
-        _result = func(*positional_only, *positional_or_keyword, *var_positional, **keyword_only, **var_keyword)
+        pre = prepare(func, *args, **kwargs, namespace=namespace, annotations=annotations)
+        _result = pre()
     except Exception as e:
         if not strict:
             debug and logger.exception(e)
@@ -278,31 +318,6 @@ def result(
         else:
             raise
     return _result if to_generator is False else generator(_result, **(to_gen_kwargs or {}))
-
-
-class Prepare:
-    def __init__(self, func: Union[str, Callable], args=None, kwargs=None, annotations=None, namespace=None):
-        if isinstance(func, str):
-            func = load_object(func, strict=True)
-        self.func = func
-        self.args: List = list(args) if args else []
-        self.kwargs: dict = kwargs or {}
-        self.parameters = inspect.signature(self.func).parameters
-        self.annotations = annotations or {}
-        self.namespace = namespace or {}
-
-    def set_kwargs(self, key, value, force=False):
-        if not self.parameters.get(key):
-            return
-        if force:
-            self.kwargs[key] = value
-        else:
-            self.namespace[key] = value
-
-    def __call__(self, *args, **kwargs):
-        kwargs['namespace'] = {**self.namespace, **kwargs.get('namespace', {})}
-        kwargs['annotations'] = {**self.annotations, **kwargs.get('annotations', {})}
-        return result(self.func, *args, args=self.args, kwargs=self.kwargs, **kwargs)
 
 
 def iterable(_object: Any, enforce=(dict, str, bytes), exclude=(), convert_null=True) -> List[Any]:
