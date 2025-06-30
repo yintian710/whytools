@@ -233,6 +233,9 @@ class Prepare:
     def __repr__(self):
         return f"<{self.__class__.__name__} func: {self.func}>"
 
+    def __eq__(self, other):
+        return self.func == other
+
 
 def prepare(
         func: Callable,
