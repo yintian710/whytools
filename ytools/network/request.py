@@ -34,7 +34,7 @@ class Request:
             proxy: Optional[Union[dict, str, List[Union[dict, str]]]] = None,
             ok: Optional[Union[str, Dict[str, Union[Callable]]]] = ...,
             retry: int = 0,
-            max_retry: [int, float] = 5,
+            max_retry: Union[int, float] = 5,
             use_session: bool = False,
     ) -> None:
         """
