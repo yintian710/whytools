@@ -246,36 +246,48 @@ def prepare(
 ) -> Prepare:
     annotations = annotations or {}
     namespace = namespace or {}
-    args = args or []
+    args = list(args or [])
     kwargs = kwargs or {}
     positional_only = []
     positional_or_keyword = []
     var_positional = []
     keyword_only = {}
     var_keyword = {}
-    sig = inspect.signature(func)
-    sig_param = sig.parameters
-    bind = sig.bind_partial(*args, **kwargs)
-    bind_arg = bind.arguments
+    signature = inspect.signature(func)
+    sig_param = signature.parameters
 
-    for key, sig_v in sig_param.items():
-        value = bind_arg.get(key, sig_v.default)
-        if value == sig_v.default:
-            value = namespace.get(key) or annotations.get(sig_v.annotation) or value
-        match sig_v.kind.name:
+    def get_positional(k, s):
+        if args:
+            v = args.pop(0)
+        elif k in kwargs:
+            v = kwargs.pop(k)
+        else:
+            v = namespace.get(k, annotations.get(k, s.default))
+        return v
+
+    def get_keyword(k, s):
+        v = kwargs.pop(k, namespace.get(k, annotations.get(k, s.default)))
+        return v
+
+    for key, sig in sig_param.items():
+        value = sig.empty
+        match sig.kind.name:
             case 'POSITIONAL_ONLY':
+                value = get_positional(key, sig)
                 positional_only.append(value)
             case 'POSITIONAL_OR_KEYWORD':
+                value = get_positional(key, sig)
                 positional_or_keyword.append(value)
             case 'VAR_POSITIONAL':
-                value = value if value and value != sig_v.empty else tuple()
+                value = args
                 var_positional = value
             case 'KEYWORD_ONLY':
+                value = get_keyword(key, sig)
                 keyword_only[key] = value
             case 'VAR_KEYWORD':
-                value = value if value and value != sig_v.empty else {}
+                value = kwargs
                 var_keyword = value
-        if value == sig_v.empty:
+        if value == sig.empty:
             raise TypeError(f"缺少参数: {key}, 参数列表: {dict(sig_param)}")
     return Prepare(
         func=func,
