@@ -100,4 +100,6 @@ class CustomMeta(type):
             instance = cls._instances[key]
         else:
             instance = new_ins()
+        if callable(install := getattr(instance, 'install', None)):
+            install()
         return instance
