@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import namedtuple
 from dataclasses import dataclass
 from typing import Literal, Any, List, Union, Generator, Dict, Callable
 from urllib import parse
@@ -491,6 +492,22 @@ def make_origin(*obj: Any):
     from hashlib import md5
     id_str = '-'.join([str(id(_)) for _ in obj])
     return md5(f'{id_str}-{time()}-{random()}'.encode()).hexdigest()
+
+
+def check_func_or_method(obj: object):
+    """
+
+    :param obj:
+    :return:
+    """
+    res = namedtuple('result', ["type", "cls"])
+
+    if inspect.ismethod(obj):
+        return res("method", obj.__self__)
+    else:
+        if '.' in (qn := obj.__qualname__):
+            return res("cls_method", f"{obj.__module__}.{qn.rsplit('.', 1)[0]}")
+        return res("function", None)
 
 
 if __name__ == '__main__':
