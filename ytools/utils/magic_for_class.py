@@ -103,3 +103,19 @@ class CustomMeta(type):
         if callable(install := getattr(instance, 'install', None)):
             install()
         return instance
+
+
+class Empty(metaclass=CustomMeta, singleton=True):
+    def __call__(self, *args, **kwargs):
+        return self
+
+    def __bool__(self):
+        return False
+
+    def __getattr__(self, item):
+        return self
+
+    def __repr__(self):
+        return "empty"
+
+    __str__ = __repr__

@@ -23,6 +23,7 @@ import importlib_metadata
 from loguru import logger
 
 from ytools.error import ResultError
+from ytools.utils.magic_for_class import Empty
 
 better_exceptions.MAX_LENGTH = None
 exec_formatter = better_exceptions.ExceptionFormatter(
@@ -516,5 +517,6 @@ def check_func_or_method(obj: object):
         return res("function", None)
 
 
+empty = Empty()
 if __name__ == '__main__':
     require('curl-cffi>=0.5.10', action='raise')

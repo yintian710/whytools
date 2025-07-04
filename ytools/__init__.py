@@ -8,6 +8,7 @@
 
 from ytools.log import logger
 from ytools.version import get_version
+from ytools.utils.magic import empty
 
 __version__ = get_version(path=__file__)
 
