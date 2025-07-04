@@ -208,6 +208,7 @@ class Prepare:
     def __init__(self, func: Union[str, Callable], args=None, kwargs=None, annotations=None, namespace=None):
         if isinstance(func, str):
             func = load_object(func, strict=True)
+        self.possession(func)
         self.func = func
         self.args: List = list(args) if args else []
         self.kwargs: dict = kwargs or {}
@@ -224,7 +225,7 @@ class Prepare:
         data = func.__dict__.copy()
         for dis in dislike:
             data.pop(dis)
-        self.__dict__ = data
+        self.__dict__.update(data)
 
     def set_kwargs(self, key, value, force=False):
         if not self.parameters.get(key):
