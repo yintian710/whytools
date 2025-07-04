@@ -124,7 +124,7 @@ setup(
     #     'console_scripts': ['mycli=mymodule:cli'],
     # },
     package_data={
-        'ytools': ['tpls/*']
+        'ytools': ["VERSION"]
     },
     install_requires=REQUIRED,
     extras_require=EXTRAS,

@@ -89,6 +89,25 @@ class TourTree:
     def used(self):
         return self._used
 
+    def print_tree(self, level=0, is_last=False, prefix='', node_info_func=None):
+        """可视化打印当前节点及其子树结构"""
+        # 当前节点信息
+        info = f"Node {self.id} (used={self.used}, done={self.is_done})" if not node_info_func else node_info_func(self)
+
+        # 根节点特殊处理
+        if level == 0:
+            print(info)
+        else:
+            # 根据是否最后一个子节点选择连接符
+            connector = '└── ' if is_last else '├── '
+            print(f"{prefix}{connector}{info}")
+
+        # 递归打印子节点
+        for i, child in enumerate(self.child):
+            is_last_child = i == len(self.child) - 1
+            new_prefix = prefix + ('    ' if is_last else '│   ')
+            child.print_tree(level + 1, is_last_child, new_prefix)
+
     def __len__(self):
         return len(self.child)
 
@@ -136,4 +155,4 @@ if __name__ == '__main__':
         if i.id == 5:
             for _ in range(3):
                 i.add(TourTree(root=rt))
-    print_tree(root)
+    root.print_tree()
