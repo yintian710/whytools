@@ -503,10 +503,12 @@ def check_func_or_method(obj: object):
     res = namedtuple('result', ["type", "cls"])
 
     if inspect.ismethod(obj):
-        return res("method", obj.__self__)
+        return res("method", obj.__self__, )
     else:
         if '.' in (qn := obj.__qualname__):
-            return res("cls_method", f"{obj.__module__}.{qn.rsplit('.', 1)[0]}")
+            obj_repr: str = qn.rsplit('.', 1)[0]
+            if not obj_repr.endswith('<locals>'):
+                return res("cls_method", f"{obj.__module__}.{obj_repr}")
         return res("function", None)
 
 
