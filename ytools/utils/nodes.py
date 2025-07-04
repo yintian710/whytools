@@ -106,7 +106,7 @@ class TourTree:
         for i, child in enumerate(self.child):
             is_last_child = i == len(self.child) - 1
             new_prefix = prefix + ('    ' if is_last else '│   ')
-            child.print_tree(level + 1, is_last_child, new_prefix)
+            child.print_tree(level + 1, is_last_child, new_prefix, node_info_func=node_info_func)
 
     def __len__(self):
         return len(self.child)
