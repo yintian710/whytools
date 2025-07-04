@@ -203,12 +203,10 @@ def load_object(path, reload=False, from_path=False, strict=True, __env__=None):
 
 
 class Prepare:
-    not_reload = [__call__]
 
     def __init__(self, func: Union[str, Callable], args=None, kwargs=None, annotations=None, namespace=None):
         if isinstance(func, str):
             func = load_object(func, strict=True)
-        self.possession(func)
         self.func = func
         self.args: List = list(args) if args else []
         self.kwargs: dict = kwargs or {}
@@ -216,16 +214,8 @@ class Prepare:
         self.annotations = annotations or {}
         self.namespace = namespace or {}
 
-    def possession(self, func):
-        dislike = [
-            "__call__",
-            "__repr__",
-            "__eq__"
-        ]
-        data = func.__dict__.copy()
-        for dis in dislike:
-            data.pop(dis)
-        self.__dict__.update(data)
+    def __getattr__(self, name):
+        return getattr(self.func, name)
 
     def set_kwargs(self, key, value, force=False):
         if not self.parameters.get(key):
