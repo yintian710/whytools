@@ -203,6 +203,8 @@ def load_object(path, reload=False, from_path=False, strict=True, __env__=None):
 
 
 class Prepare:
+    not_reload = [__call__]
+
     def __init__(self, func: Union[str, Callable], args=None, kwargs=None, annotations=None, namespace=None):
         if isinstance(func, str):
             func = load_object(func, strict=True)
@@ -212,6 +214,17 @@ class Prepare:
         self.parameters = inspect.signature(self.func).parameters
         self.annotations = annotations or {}
         self.namespace = namespace or {}
+
+    def possession(self, func):
+        dislike = [
+            "__call__",
+            "__repr__",
+            "__eq__"
+        ]
+        data = func.__dict__.copy()
+        for dis in dislike:
+            data.pop(dis)
+        self.__dict__ = data
 
     def set_kwargs(self, key, value, force=False):
         if not self.parameters.get(key):
@@ -230,9 +243,6 @@ class Prepare:
     def __call__(self, *args, **kwargs):
         (args or kwargs) and self.re_build(*args, **kwargs)
         return self.func(*self.args, **self.kwargs)
-
-    def __name__(self):
-        return self.func.__name__
 
     def __repr__(self):
         return f"<{self.__class__.__name__} func: {self.func}>"
