@@ -382,6 +382,10 @@ def generator(_object: Any, **kwargs) -> Generator:
         return (i for i in iterable(_object, **kwargs))
 
 
+def to_list(_object, **kwargs) -> List:
+    return [*iterable(_object, **kwargs)]
+
+
 def single(_object, default=None):
     """
     将元素变为可迭代对象后, 获取其第一个元素
