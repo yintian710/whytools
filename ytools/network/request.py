@@ -6,7 +6,6 @@
 @Desc    :  Request mode by bricks
 """
 import argparse
-import json
 import re
 import shlex
 import urllib.parse
@@ -116,7 +115,7 @@ class Request:
         else:
             cookie_str = ""
 
-        content_type = None
+        content_type = ''
         if self.headers:
             for header, value in self.headers.items():
                 if header.lower() == 'cookie':
@@ -128,21 +127,26 @@ class Request:
 
         cookie_str and parts.append(f"-H {shlex.quote(f'Cookie: {cookie_str}')}")
 
+        if self.json:
+            body = self.json
+        elif self.data:
+            body = self.data.decode() if isinstance(self.data, bytes) else self.data
+        else:
+            body = None
         # 添加请求体
-        if self.body:
-            if content_type == 'application/json':
+        if body:
+            if content_type.__contains__('application/json'):
                 # JSON格式的请求体
-                json_data = json.dumps(self.body)
-                parts.append(f"-d {shlex.quote(json_data)}")
-            elif content_type == 'application/x-www-form-urlencoded':
+                parts.append(f"-d {shlex.quote(body)}")
+            elif content_type.__contains__('application/x-www-form-urlencoded'):
                 # URL编码格式的请求体
-                form_data = urllib.parse.urlencode(self.body)
+                form_data = urllib.parse.urlencode(body)
                 parts.append(f"--data {shlex.quote(form_data)}")
             else:
-                if isinstance(self.body, dict):
-                    body_data = urllib.parse.urlencode(self.body)
+                if isinstance(body, dict):
+                    body_data = urllib.parse.urlencode(body)
                 else:
-                    body_data = self.body
+                    body_data = body
                 # 其他或未知类型，假定为字符串
                 parts.append(f"--data {shlex.quote(body_data)}")
 
@@ -223,14 +227,18 @@ class Request:
         parsed_url = urllib.parse.urlparse(parsed_args.url)
         # 提取查询字符串并解析为字典
         params = dict(urllib.parse.parse_qsl(parsed_url.query))
+        if (quoted_headers.get('Content-Type') or quoted_headers.get('content-type')).__contains__("json"):
+            data = {"json": post_data}
+        else:
+            data = {"data": post_data}
 
         return cls(
             url=parsed_url.scheme + "://" + parsed_url.netloc + parsed_url.path,
             params=params,
             method=method,
-            body=post_data,
             headers=quoted_headers,
             cookies=cookie_dict,
+            **data
         )
 
     def put_options(self, key: str, value, action="update"):
