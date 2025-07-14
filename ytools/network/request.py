@@ -24,7 +24,8 @@ class Request:
             url: str,
             params: Optional[dict] = None,
             method: str = 'GET',
-            body: Optional[Union[str, dict]] = None,
+            data: Union[str, dict] = None,
+            json_data: Union[dict, list] = None,
             headers: Union[Header, dict] = None,
             cookies: Dict[str, str] = None,
             options: dict = None,
@@ -42,11 +43,6 @@ class Request:
         :param url: 请求 URL
         :param params: 请求 URL 参数
         :param method: 请求方法, 默认 GET
-        :param body: 请求 Body, 支持字典 / 字符串, 传入为字典的时候, 具体编码方式看 headers 里面的 Content-type
-                    # 求的 body, 全部设置为字典时需要和 headers 配合, 规则如下请
-                    # 如果是 json 格式, headers 里面设置 Content-Type 为 application/json
-                    # 如果是 form urlencoded 格式, headers 里面设置 Content-Type 为 application/x-www-form-urlencoded
-                    # 如果是 form data 格式, headers 里面设置 Content-Type 为 multipart/form-data
         :param headers: 请求头
         :param cookies: 请求 cookies
         :param options: 请求其他额外选项, 可以用于配合框架 / 下载器
@@ -64,7 +60,8 @@ class Request:
         self.params = params
         self.cookies = cookies
         self.method = method.upper()
-        self.body = body
+        self.data = data
+        self.json = json_data
         self._headers = Header(headers)
         self.options = options or {}
         self.timeout = timeout

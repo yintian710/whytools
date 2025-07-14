@@ -5,8 +5,9 @@
 @Author  : yintian
 @Desc    : 
 """
+import time
+from collections.abc import Callable
 from typing import Literal
-
 
 from ytools.utils.magic import require
 
@@ -82,6 +83,12 @@ class Arrow(_Arrow):
         :return:
         """
         return self.get(self.ceil(frame))
+
+    def spend(self, fmt: Callable = None):
+        t = time.time() - self.ts(10)
+        if fmt:
+            t = fmt(t)
+        return t
 
     def format(
             self, fmt: str = "YYYY-MM-DD HH:mm:ss", locale: str = DEFAULT_LOCALE
