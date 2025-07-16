@@ -14,7 +14,6 @@ import re
 import subprocess
 import sys
 from collections import namedtuple
-from dataclasses import dataclass
 from typing import Literal, Any, List, Union, Generator, Dict, Callable
 from urllib import parse
 
