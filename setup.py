@@ -27,7 +27,7 @@ EMAIL = 'yintian710@gmail.com'
 AUTHOR = 'yintian'
 REQUIRES_PYTHON = '>=3.8.0'
 
-VERSION = update_version(save=False, path=__file__)
+VERSION = update_version(save=False)
 
 # What packages are required for this module to be executed?
 REQUIRED = [
