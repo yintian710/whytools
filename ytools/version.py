@@ -23,7 +23,7 @@ def get_version(package='ytools', show=False, path=__file__):
     return version
 
 
-def update_version(version=None, update_type='micro', package='ytools', save=True, path=__file__):
+def update_version(version=None, update_type='auto', package='ytools', save=True, path=__file__):
     # 读取当前版本
     version = version or get_version(package=package, path=path)
     try:
@@ -40,8 +40,11 @@ def update_version(version=None, update_type='micro', package='ytools', save=Tru
     post = v.post  # 后发布版本
     epoch = v.epoch  # 纪元版本
 
+    if update_type == 'auto' and pre:
+        update_type = 'pre'
+
     # 根据更新类型处理版本
-    if update_type == 'micro':
+    if update_type in ('micro', 'auto'):
         micro += 1
         pre = post = dev = None
     elif update_type == 'minor':
