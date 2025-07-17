@@ -11,8 +11,8 @@ import os
 from packaging.version import Version
 
 
-def get_version(package='ytools', show=False, path=None):
-    this_dir = os.path.dirname(os.path.dirname(path or __file__))
+def get_version(package='ytools', show=False, path=__file__):
+    this_dir = os.path.dirname(os.path.dirname(path))
     version_path = os.path.join(this_dir, package, 'VERSION')
     if not os.path.exists(version_path):
         print(f'未找到 VERSION 文件')
@@ -23,9 +23,9 @@ def get_version(package='ytools', show=False, path=None):
     return version
 
 
-def update_version(version=None, update_type='micro', package='ytools', save=True):
+def update_version(version=None, update_type='micro', package='ytools', save=True, path=__file__):
     # 读取当前版本
-    version = version or get_version(package=package)
+    version = version or get_version(package=package, path=path)
     try:
         v = Version(version)
     except:  # noqa
@@ -66,16 +66,24 @@ def update_version(version=None, update_type='micro', package='ytools', save=Tru
                           (f"{pre[0]}{pre[1]}" if pre else "") +
                           (f".post{post}" if post else "") +
                           (f".dev{dev}" if dev else "")).public
-    save and save_version(new_version, package)
+    save and save_version(new_version, package, path=path)
     return new_version
 
 
-def save_version(version, package='ytools'):
-    this_dir = os.path.dirname(os.path.dirname(__file__))
+def save_version(version, package='ytools', path=__file__):
+    this_dir = os.path.dirname(os.path.dirname(path))
     version_path = os.path.join(this_dir, package, 'VERSION')
     # 写回文件
     with open(version_path, 'w') as f:
         f.write(str(version) + '\n')
+
+
+def is_main_version(version):
+    try:
+        v = Version(version)
+    except:  # noqa
+        raise ValueError(f"无效的版本号格式: {version}")
+    return not any([v.post, v.dev, v.pre, v.epoch])
 
 
 if __name__ == '__main__':
