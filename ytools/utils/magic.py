@@ -47,15 +47,15 @@ PYPI_MIRROR = {
 }
 
 
-
 def require(
         package_spec: str,
         action: Literal["raise", "fix"] = "fix",
         mirror_sources: str = "TUNA",
         kwargs: Dict[str, str] = None,
-        mode="uv"
+        mode=None
 ):
     kwargs = kwargs or {}
+    mode = mode or os.environ.get('$require_mode') or 'pip'
     match mode:
         case "pip":
             require_pip(package_spec, action, mirror_sources, kwargs)
