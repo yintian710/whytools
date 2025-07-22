@@ -47,7 +47,77 @@ PYPI_MIRROR = {
 }
 
 
+
 def require(
+        package_spec: str,
+        action: Literal["raise", "fix"] = "fix",
+        mirror_sources: str = "TUNA",
+        kwargs: Dict[str, str] = None,
+        mode="uv"
+):
+    kwargs = kwargs or {}
+    match mode:
+        case "pip":
+            require_pip(package_spec, action, mirror_sources, kwargs)
+        case "uv":
+            require_uv(package_spec, action, mirror_sources, kwargs)
+        case _:
+            if callable(func := locals().get('require_uv')):
+                func(package_spec, action, mirror_sources, kwargs)
+            else:
+                raise ValueError(f"can not find require_{mode}")
+
+
+def require_uv(
+        package_spec: str,
+        action: Literal["raise", "fix"] = "fix",
+        mirror_sources: str = "TUNA",
+        uv_kwargs: Dict[str, str] = None
+):
+    package_spec = re.sub(r"\s+", "", package_spec)
+    match = PACKAGE_REGEX.match(package_spec)
+    mirror_sources = PYPI_MIRROR.get(mirror_sources, mirror_sources)
+
+    assert match, ValueError(f"无效的包规范: {package_spec}")
+    assert not mirror_sources or PIPY_REGEX.match(mirror_sources), ValueError(f"无效的镜像源: {mirror_sources}")
+    package, operator, required_version = match.groups()
+    mirror_sources and uv_kwargs.setdefault('--index', mirror_sources)
+
+    try:
+        import uv  # noqa
+    except ImportError:
+        require("uv", mode="pip", action="fix")
+        import uv  # noqa
+
+    try:
+        # 获取已安装的包版本
+        installed_version = importlib_metadata.version(package)
+        # 检查是否需要安装或更新
+        from ytools.utils.package import parse as version_parse
+        if required_version and not eval(
+                f'version_parse({installed_version!r}) {operator} version_parse({required_version!r})'):
+            raise importlib_metadata.PackageNotFoundError
+        else:
+            return installed_version
+
+    except importlib_metadata.PackageNotFoundError:
+
+        # 包没有安装或版本不符合要求
+        install_command = package_spec if required_version else package
+        cmd = [uv.find_uv_bin(), "add"]
+        for k, v in uv_kwargs.items():
+            k and cmd.append(k)
+            v and cmd.append(v)
+        cmd.append(install_command)
+        if action == "raise":
+            raise importlib_metadata.PackageNotFoundError(f"依赖包不符合要求, 请使用以下命令安装: {' '.join(cmd)}")
+        else:
+            logger.debug(f"依赖包不符合要求, 自动修正, 命令: {' '.join(cmd)}")
+            subprocess.check_call(cmd)
+            return importlib_metadata.version(package)
+
+
+def require_pip(
         package_spec: str,
         action: Literal["raise", "fix"] = "fix",
         mirror_sources: str = "TUNA",
@@ -77,7 +147,7 @@ def require(
         # 获取已安装的包版本
         installed_version = importlib_metadata.version(package)
         # 检查是否需要安装或更新
-        from ytools.utils.package import parse as version_parse  # noqa
+        from ark.utils.package import parse as version_parse  # noqa
         if required_version and not eval(
                 f'version_parse({installed_version!r}) {operator} version_parse({required_version!r})'):
             raise importlib_metadata.PackageNotFoundError
