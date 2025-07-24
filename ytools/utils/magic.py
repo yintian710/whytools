@@ -147,7 +147,7 @@ def require_pip(
         # 获取已安装的包版本
         installed_version = importlib_metadata.version(package)
         # 检查是否需要安装或更新
-        from ark.utils.package import parse as version_parse  # noqa
+        from ytools.utils.package import parse as version_parse  # noqa
         if required_version and not eval(
                 f'version_parse({installed_version!r}) {operator} version_parse({required_version!r})'):
             raise importlib_metadata.PackageNotFoundError

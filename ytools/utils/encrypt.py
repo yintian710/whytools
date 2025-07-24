@@ -8,12 +8,15 @@
 """
 import base64
 import json
+import sys
 from hashlib import md5 as raw_md5
 
 from ytools.utils.magic import json_or_eval
 
+default_encoding = sys.getdefaultencoding()
 
-def md5(obj, encoding=None):
+
+def md5(obj, encoding=default_encoding):
     if not isinstance(obj, (str, bytes)):
         obj = json.dumps(obj, default=str, indent=0).encode(encoding=encoding)
     if isinstance(obj, str):
@@ -22,7 +25,7 @@ def md5(obj, encoding=None):
     return raw_md5(obj).hexdigest()
 
 
-def to_b64(obj, encoding=None):
+def to_b64(obj, encoding=default_encoding):
     if not isinstance(obj, (str, bytes)):
         obj = json.dumps(obj, default=str, indent=0).encode(encoding=encoding)
     if isinstance(obj, str):
@@ -30,7 +33,7 @@ def to_b64(obj, encoding=None):
     return base64.b64encode(obj).decode(encoding=encoding)
 
 
-def from_b64(obj, fmt=True, encoding=None):
+def from_b64(obj, fmt=True, encoding=default_encoding):
     obj = base64.b64decode(obj)
     if callable(fmt):
         return callable(obj)
@@ -42,4 +45,4 @@ def from_b64(obj, fmt=True, encoding=None):
 
 
 if __name__ == '__main__':
-    pass
+    print(md5('123'))

@@ -8,6 +8,10 @@
 """
 import os
 
+from ytools.utils.magic import require
+
+require("packaging")
+
 from packaging.version import Version
 
 
