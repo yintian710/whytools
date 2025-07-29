@@ -250,7 +250,8 @@ def save_data(data, filename=None, save=None, min_length=100, tag='default', sav
 
 
 def get_track(
-        distance: int,
+        distance: int = 0,
+        node: int = 0,
         track_list: list = None,
         filename="",
         max_dis=1000,
@@ -261,12 +262,15 @@ def get_track(
     获取随机轨迹
     :param filename: 轨迹的文件
     :param distance: 需生成的轨迹长度, 需要小于 max_dis 以及 track_list中的最小长度的三分之一, 用以保证轨迹的随机性
+    :param node: 节点数量, 与 distance 任选其一传入即可
     :param track_list: 自带轨迹, 在该轨迹中随机选取一段轨迹
     :param max_dis: 限制最大传入长度
-    :param min_node: 最少的节点数, 用以保证轨迹的随机性
+    :param min_node: 选取的轨迹最少的节点数, 用以保证生成的轨迹的随机性
     :param tag: 
     :return:
     """
+
+    assert distance or node, ValueError(f"distance 与 node 最少传入一个")
 
     def get_track_list():
         assert filename, "未传入轨迹或文件"
@@ -311,13 +315,14 @@ def get_track(
         start = one_track[start_index]
         return last, start, one_track, one_track_xy, start_index
 
-    def get_target_track():
+    def get_dis_track():
         """
         获取目标轨迹
         :return:
         """
         last, start, one_track, one_track_xy, start_index = get_one_track()
         while last - start < distance:
+            logger.debug(f"轨迹长度小于需要的长度")
             last, start, one_track, one_track_xy, start_index = get_one_track()
         target = start + distance
         target_index = binary_search(one_track, target)
@@ -330,6 +335,20 @@ def get_track(
         while _result[-2][0] >= _distance:
             _result.pop(-1)
         _result[-1][0] = target - start_row[0]
+        return _result
+
+    def get_node_track():
+        last, start, one_track, one_track_xy, start_index = get_one_track()
+        while len(one_track_xy) < node + 10:
+            logger.debug(f"轨迹节点数小于需要的节点")
+            last, start, one_track, one_track_xy, start_index = get_one_track()
+
+        target_index = start_index + node
+        _res = one_track_xy[start_index: target_index]
+        start_row = _res[0]
+        _result = []
+        for _ in _res:
+            _result.append([_[i] - start_row[i] for i in range(len(_))])
         return _result
 
     while not (track_list or local_track[f'$track_list_{tag}']):
@@ -347,14 +366,18 @@ def get_track(
 
     assert track_list != [], "未获取到符合条件的 track_list !"
 
-    if distance > max_dis:
-        raise ValueError('Distance 太大了')
-
-    track = get_target_track()
+    if not distance:
+        if node > min_node:
+            raise ValueError('node 太大了')
+        track = get_node_track()
+    else:
+        if distance > max_dis:
+            raise ValueError('Distance 太大了')
+        track = get_dis_track()
     return track
 
 
 if __name__ == '__main__':
     # print(get_track(130, tag='default'))
     # listener(filename='a.json', tag='low1', plat='pc', interval=0.01)
-    get_track(filename='a.json', distance=100)
+    print(get_track(filename='a.json', node=80))
