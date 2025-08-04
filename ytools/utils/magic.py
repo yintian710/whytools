@@ -295,6 +295,14 @@ class Prepare:
         else:
             self.namespace[key] = value
 
+    @property
+    def is_async(self):
+        return inspect.iscoroutinefunction(self.func) or self.is_awaitable
+
+    @property
+    def is_awaitable(self):
+        return inspect.isawaitable(self.func)
+
     def re_build(self, *args, **kwargs):
         kwargs['namespace'] = {**self.namespace, **kwargs.get('namespace', {})}
         kwargs['annotations'] = {**self.annotations, **kwargs.get('annotations', {})}
@@ -318,7 +326,7 @@ class Prepare:
             def run_sync():
                 return self.func(*self.args, **self.kwargs)
 
-            if inspect.iscoroutinefunction(self.func) or inspect.isawaitable(self.func):
+            if self.is_async:
                 return run_async()
             else:
                 return run_sync()
