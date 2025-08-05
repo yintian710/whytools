@@ -312,26 +312,13 @@ class Prepare:
     def __call__(self, *args, **kwargs):
         (args or kwargs) and self.re_build(*args, **kwargs)
 
-        def run():
-            def run_async():
-                import asyncio
+        return self.func(*self.args, **self.kwargs)
 
-                async def _run():
-                    return await self.func(*self.args, **self.kwargs)
+    def __await__(self):
+        async def inner():
+            return await self.func(*self.args, **self.kwargs)
 
-                loop = asyncio.get_event_loop()
-                fu = asyncio.run_coroutine_threadsafe(_run(), loop)
-                return fu.result()
-
-            def run_sync():
-                return self.func(*self.args, **self.kwargs)
-
-            if self.is_async:
-                return run_async()
-            else:
-                return run_sync()
-
-        return run()
+        return inner().__await__()
 
     def __repr__(self):
         return f"<{self.__class__.__name__} func: {self.func}>"
