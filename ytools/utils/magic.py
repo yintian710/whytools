@@ -255,9 +255,9 @@ def load_object(path, reload=False, from_path=False, strict=True, __env__=None):
         for attr in filter(bool, [*sons.split("."), *attrs.split(".")]):
             try:
                 ret = getattr(ret, attr)
-            except:  # noqa
+            except Exception as e:
                 if strict:
-                    raise ValueError(f"加载对象失败: {raw}")
+                    raise ValueError(f"加载对象失败: {raw}; exception: {e}")
                 else:
                     return raw
         else:
