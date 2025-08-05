@@ -297,7 +297,7 @@ class Prepare:
 
     @property
     def is_async(self):
-        return inspect.iscoroutinefunction(self.func) or self.is_awaitable
+        return inspect.iscoroutinefunction(self.func)
 
     @property
     def is_awaitable(self):
@@ -312,13 +312,13 @@ class Prepare:
     def __call__(self, *args, **kwargs):
         (args or kwargs) and self.re_build(*args, **kwargs)
 
-        return self.func(*self.args, **self.kwargs)
-
-    def __await__(self):
-        async def inner():
+        async def async_inner():
             return await self.func(*self.args, **self.kwargs)
 
-        return inner().__await__()
+        if self.is_async:
+            return async_inner()
+
+        return self.func(*self.args, **self.kwargs)
 
     def __repr__(self):
         return f"<{self.__class__.__name__} func: {self.func}>"
