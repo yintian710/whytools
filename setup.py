@@ -5,12 +5,14 @@
 @Author  : yintian
 @Desc    : 
 """
+import configparser
 # Note: To use the 'upload' functionality of this file, you must:
 #   $ pipenv install twine --dev
 
 import io
 import os
 import sys
+from pathlib import Path
 from shutil import rmtree
 
 from setuptools import find_packages, setup, Command
@@ -94,6 +96,15 @@ class UploadCommand(Command):
 
         self.log('Uploading the package to PyPI via Twine¡­')
         os.system('twine upload dist/*')
+
+        def upload2zz():
+            pypirc_path = Path.home() / '.pypirc'
+            config = configparser.ConfigParser()
+            config.read(pypirc_path)
+            if 'zz' in config.sections():
+                os.system('twine upload --repository zz dist/*')
+
+        upload2zz()
         save_version(version=about['__version__'])
 
         self.log('Pushing git tags¡­')
