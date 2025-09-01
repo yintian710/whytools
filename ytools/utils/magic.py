@@ -320,7 +320,7 @@ def prepare(
         return v
 
     def get_keyword(k, s):
-        v = kwargs.pop(k, namespace.get(k, annotations.get(k, s.default)))
+        v = kwargs.pop(k, namespace.get(k, annotations.get(s.annotation, s.default)))
         return v
 
     for key, sig in sig_param.items():
