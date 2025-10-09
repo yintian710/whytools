@@ -56,91 +56,14 @@ def require(
 ):
     kwargs = kwargs or {}
     mode = mode or os.environ.get('$require_mode') or 'pip'
-    match mode:
-        case "pip":
-            require_pip(package_spec, action, mirror_sources, kwargs)
-        case "uv":
-            require_uv(package_spec, action, mirror_sources, kwargs)
-        case _:
-            if callable(func := locals().get('require_uv')):
-                func(package_spec, action, mirror_sources, kwargs)
-            else:
-                raise ValueError(f"can not find require_{mode}")
 
-
-def require_uv(
-        package_spec: str,
-        action: Literal["raise", "fix"] = "fix",
-        mirror_sources: str = "TUNA",
-        uv_kwargs: Dict[str, str] = None
-):
     package_spec = re.sub(r"\s+", "", package_spec)
     match = PACKAGE_REGEX.match(package_spec)
     mirror_sources = PYPI_MIRROR.get(mirror_sources, mirror_sources)
 
     assert match, ValueError(f"无效的包规范: {package_spec}")
     assert not mirror_sources or PIPY_REGEX.match(mirror_sources), ValueError(f"无效的镜像源: {mirror_sources}")
-    package, operator, required_version = match.groups()
-    mirror_sources and uv_kwargs.setdefault('--index', mirror_sources)
 
-    try:
-        import uv  # noqa
-    except ImportError:
-        require("uv", mode="pip", action="fix")
-        import uv  # noqa
-
-    try:
-        # 获取已安装的包版本
-        installed_version = importlib_metadata.version(package)
-        # 检查是否需要安装或更新
-        from ytools.utils.package import parse as version_parse
-        if required_version and not eval(
-                f'version_parse({installed_version!r}) {operator} version_parse({required_version!r})'):
-            raise importlib_metadata.PackageNotFoundError
-        else:
-            return installed_version
-
-    except importlib_metadata.PackageNotFoundError:
-
-        # 包没有安装或版本不符合要求
-        install_command = package_spec if required_version else package
-        cmd = [uv.find_uv_bin(), "add"]
-        for k, v in uv_kwargs.items():
-            k and cmd.append(k)
-            v and cmd.append(v)
-        cmd.append(install_command)
-        if action == "raise":
-            raise importlib_metadata.PackageNotFoundError(f"依赖包不符合要求, 请使用以下命令安装: {' '.join(cmd)}")
-        else:
-            logger.debug(f"依赖包不符合要求, 自动修正, 命令: {' '.join(cmd)}")
-            subprocess.check_call(cmd)
-            return importlib_metadata.version(package)
-
-
-def require_pip(
-        package_spec: str,
-        action: Literal["raise", "fix"] = "fix",
-        mirror_sources: str = "TUNA",
-        pip_kwargs: Dict[str, str] = None
-) -> str:
-    """
-    依赖 python 包
-
-    :param action: 依赖操作, 若为 fix 则自动下载对应包,
-    :param package_spec: pymongo==4.6.0 / pymongo
-    :param mirror_sources : pip 源, 内置有 "TUNA", "USTC", "Aliyun", "Tencent", "Huawei", "pypi", 可以传自己的源进来
-    :param pip_kwargs: pip 的一些参数, 如 --trusted-host, 单独的参数可以使用 {"--upgrade": ""} 这种方式
-    :return: 安装的包版本号
-    """
-    # 分离包名和版本规范
-    package_spec = re.sub(r"\s+", "", package_spec)
-    match = PACKAGE_REGEX.match(package_spec)
-    mirror_sources = PYPI_MIRROR.get(mirror_sources, mirror_sources)
-    pip_kwargs = pip_kwargs or {}
-
-    assert match, ValueError(f"无效的包规范: {package_spec}")
-    assert not mirror_sources or PIPY_REGEX.match(mirror_sources), ValueError(f"无效的镜像源: {mirror_sources}")
-    mirror_sources and pip_kwargs.setdefault('-i', mirror_sources)
     package, operator, required_version = match.groups()
 
     try:
@@ -156,19 +79,60 @@ def require_pip(
 
     except importlib_metadata.PackageNotFoundError:
 
-        # 包没有安装或版本不符合要求
-        install_command = package_spec if required_version else package
-        cmd = [sys.executable, "-m", "pip", "install"]
-        for k, v in pip_kwargs.items():
-            k and cmd.append(k)
-            v and cmd.append(v)
-        cmd.append(install_command)
+        package = package_spec if required_version else package
+        match mode:
+            case "pip":
+                cmd = require_cmd_by_pip(package, mirror_sources, kwargs)
+            case "uv":
+                cmd = require_cmd_by_uv(package, mirror_sources, kwargs)
+            case _:
+                if callable(func := globals().get('require_uv')):
+                    cmd = func(package, action, mirror_sources, kwargs)
+                else:
+                    raise ValueError(f"can not find require_{mode}")
         if action == "raise":
-            raise importlib_metadata.PackageNotFoundError(f"依赖包不符合要求, 请使用以下命令安装: {' '.join(cmd)}")
+            raise importlib_metadata.PackageNotFoundError(
+                f"依赖包不符合要求, 请使用以下命令安装: {' '.join(cmd)}"
+            )
         else:
             logger.debug(f"依赖包不符合要求, 自动修正, 命令: {' '.join(cmd)}")
             subprocess.check_call(cmd)
             return importlib_metadata.version(package)
+
+
+def require_cmd_by_pip(
+        package: str,
+        mirror_sources: str = "",
+        pip_kwargs: Dict[str, str] = None
+):
+    mirror_sources and pip_kwargs.setdefault("-i", mirror_sources)
+    cmd = [sys.executable, "-m", "pip", "install"]
+    for k, v in pip_kwargs.items():
+        k and cmd.append(k)
+        v and cmd.append(v)
+    cmd.append(package)
+    return cmd
+
+
+def require_cmd_by_uv(
+        package: str,
+        mirror_sources: str = "",
+        uv_kwargs: Dict[str, str] = None
+):
+    mirror_sources and uv_kwargs.setdefault("--default-index", mirror_sources)
+
+    try:
+        import uv  # noqa
+    except ImportError:
+        require("uv", mode="pip", action="fix")
+        import uv  # noqa
+
+    cmd = [uv.find_uv_bin(), "add"]
+    for k, v in uv_kwargs.items():
+        k and cmd.append(k)
+        v and cmd.append(v)
+    cmd.append(package)
+    return cmd
 
 
 def load_object(path, reload=False, from_path=False, strict=True, __env__=None):
@@ -352,11 +316,11 @@ def prepare(
         elif k in kwargs:
             v = kwargs.pop(k)
         else:
-            v = namespace.get(k, annotations.get(k, s.default))
+            v = namespace.get(k, annotations.get(s.annotation, s.default))
         return v
 
     def get_keyword(k, s):
-        v = kwargs.pop(k, namespace.get(k, annotations.get(k, s.default)))
+        v = kwargs.pop(k, namespace.get(k, annotations.get(s.annotation, s.default)))
         return v
 
     for key, sig in sig_param.items():
@@ -607,4 +571,4 @@ def check_func_or_method(obj: object):
 
 empty = Empty()
 if __name__ == '__main__':
-    require('curl-cffi>=0.5.10', action='raise')
+    require('curl-cffi>=8.8.10', action='raise', mode="uv")
