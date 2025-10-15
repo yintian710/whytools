@@ -399,6 +399,36 @@ def result(
     return _result if to_generator is False else generator(_result, **(to_gen_kwargs or {}))
 
 
+async def async_result(
+        func,
+        args: Union[list, tuple] = None,
+        kwargs: dict = None,
+        strict: bool = True,
+        debug: bool = True,
+        annotations: dict = None,
+        namespace: dict = None,
+        to_generator: bool = False,
+        to_gen_kwargs: dict = None
+):
+    _result = result(func, args, kwargs, strict, debug, annotations, namespace, to_generator=False, to_gen_kwargs=None)
+    if inspect.isawaitable(_result):
+        try:
+            _result = await _result
+        except Exception as e:
+            if not strict:
+                debug and logger.exception(e)
+                _result = ResultError(
+                    error=e,
+                    stack=fmt_stack(e),
+                    f=func,
+                    a=args,
+                    k=kwargs
+                )
+            else:
+                raise
+        return _result if (inspect.isawaitable(_result) or to_generator is False) else generator(_result, **(to_gen_kwargs or {}))
+
+
 def iterable(_object: Any, enforce=(dict, str, bytes), exclude=(), convert_null=True) -> List[Any]:
     """
     用列表将 `_exclude` 类型中的其他类型包装起来
