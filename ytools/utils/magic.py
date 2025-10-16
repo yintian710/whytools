@@ -426,7 +426,7 @@ async def async_result(
                 )
             else:
                 raise
-        return _result if (inspect.isawaitable(_result) or to_generator is False) else generator(_result, **(to_gen_kwargs or {}))
+    return _result if (inspect.isawaitable(_result) or to_generator is False) else generator(_result, **(to_gen_kwargs or {}))
 
 
 def iterable(_object: Any, enforce=(dict, str, bytes), exclude=(), convert_null=True) -> List[Any]:
