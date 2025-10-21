@@ -58,7 +58,8 @@ class Agent(BaseClient):
         return Task(
             data=data,
             client=self,
-            task_id=task_id
+            task_id=task_id,
+            fmt=True
         )
 
     async def zpop(self, key: str):

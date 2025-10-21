@@ -56,9 +56,8 @@ class Task:
             else:
                 data = SaltBase64(key=str(encrypt), encoding=setting.DEFAULT_ENCODING).decrypt(data)
         if setting.OBJ_DATA:
-            data = magic.json_or_eval(data)
+            data = magic.json_or_eval(data.decode(setting.DEFAULT_ENCODING))
         return data
-
 
 
 if __name__ == '__main__':
