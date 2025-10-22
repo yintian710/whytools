@@ -24,8 +24,13 @@ class Client(BaseClient):
 
     async def put_task(self, task: Task):
         data_queue = self.get_queue(task.task_id, base=self.data_queue)
-        await self.redis.zadd(self.tasks_queue, {task.task_id: task.score})
-        await self.redis.set(data_queue, task.encode_data(), ex=setting.EXPIRE_TIME)
+
+        async with self.redis.pipeline(transaction=True) as pipe:
+            await pipe.zadd(self.tasks_queue, {task.task_id: task.score})
+            await pipe.set(data_queue, task.encode_data(), ex=setting.EXPIRE_TIME)
+            results = await pipe.execute()
+            if not all(results):  # 检查是否有命令失败
+                raise ValueError(f"投放任务至队列失败: {results}")
 
     async def result(self, task, timeout=None):
         res = await self.get_result_by_id(task.task_id, timeout=timeout)

@@ -14,11 +14,7 @@ from ytools import logger
 from ytools.arq import setting
 from ytools.arq.client.base import BaseClient
 from ytools.arq.task.task import Task
-class AsyncNullContext:
-    async def __aenter__(self):
-        return None
-    async def __aexit__(self, exc_type, exc, tb):
-        return False
+
 
 class Agent(BaseClient):
     def __init__(self, worker: Callable[[Task], Any], max_concurrency=None, **kwargs):
@@ -53,7 +49,7 @@ class Agent(BaseClient):
             return None
         data = await self.redis.get(self.get_queue(task_id, base=self.data_queue))
         if data is None:
-            logger.error(f"task_id 未获取到数据")
+            logger.error(f"task_id:{task_id} 未获取到数据")
             return None
         return Task(
             data=data,
