@@ -64,7 +64,7 @@ class Task:
         return data
 
     async def ensure(self):
-        pubsub = self.client.pubsub()
+        pubsub = self.client.redis.pubsub()
         await pubsub.subscribe(self.result_queue)
 
         async def get_result():
