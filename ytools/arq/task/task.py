@@ -87,6 +87,14 @@ class Task:
             self.result.cancel()
         return result
 
+    async def set_status(self, data, status_name="status", expire_time=None):
+        status_queue = self.client.get_queue(status_name, base=self.result_queue)
+        await self.client.redis.set(status_queue, data, ex=expire_time or setting.EXPIRE_TIME)
+
+    async def get_status(self, status_name="status"):
+        status_queue = self.client.get_queue(status_name, base=self.result_queue)
+        return await self.client.redis.get(status_queue)
+
 
 if __name__ == '__main__':
     pass
