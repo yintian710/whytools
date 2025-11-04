@@ -19,7 +19,7 @@ from setuptools import find_packages, setup, Command
 
 from ytools.utils.file import get_file_read
 from ytools.log import logger
-from ytools.version import update_version, save_version
+from ytools.version import update_version, get_version
 
 # Package meta-data.
 NAME = 'why-tools'
@@ -31,6 +31,8 @@ REQUIRES_PYTHON = '>=3.8.0'
 logger.error(f"!!!!!!")
 if len(sys.argv) == 1:
     VERSION = update_version()
+else:
+    VERSION = get_version()
 
 # What packages are required for this module to be executed?
 REQUIRED = [
