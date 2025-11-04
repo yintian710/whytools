@@ -28,8 +28,9 @@ URL = 'https://github.com/yintian710/whytools'
 EMAIL = 'yintian710@gmail.com'
 AUTHOR = 'yintian'
 REQUIRES_PYTHON = '>=3.8.0'
-
-VERSION = update_version(save=False)
+logger.error(f"!!!!!!")
+if len(sys.argv) == 1:
+    VERSION = update_version()
 
 # What packages are required for this module to be executed?
 REQUIRED = [
@@ -94,11 +95,10 @@ class UploadCommand(Command):
         os.system(f'{sys.executable} setup.py sdist bdist_wheel --universal')
         self.log('Building Source and Wheel (universal) distribution…')
 
-        self.log(f"保存版本号: {about['__version__']}")
-        save_version(version=about['__version__'])
-
         os.system(f'{sys.executable} setup.py sdist build')
 
+        # self.log(f"保存版本号: {about['__version__']}")
+        # save_version(version=about['__version__'])
         self.log('Uploading the package to PyPI via Twine…')
         os.system('twine upload dist/*')
 
