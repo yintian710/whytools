@@ -58,6 +58,22 @@ class BaseClient:
     def from_redis(cls, queue_name=None, **redis_config):
         return cls(queue_name, redis=redis_config)
 
+    async def set_status(self, status_id, data=None, expire_time=None):
+        status_queue = self.get_queue(status_id, base=self.status_queue)
+        expire_time = expire_time or setting.EXPIRE_TIME
+        if data is not None:
+            await self.redis.set(status_queue, data, ex=expire_time)
+        if await self.redis.exists(status_id):
+            await self.redis.expire(status_queue, expire_time)
+
+    async def get_status(self, status_id):
+        status_queue = self.get_queue(status_id, base=self.status_queue)
+        return await self.redis.get(status_queue)
+
+    async def del_status(self, status_id):
+        status_queue = self.get_queue(status_id, base=self.status_queue)
+        return await self.redis.delete(status_queue)
+
 
 if __name__ == '__main__':
     pass
