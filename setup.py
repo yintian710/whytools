@@ -88,11 +88,14 @@ class UploadCommand(Command):
             rmtree(os.path.join(here, 'dist'))
         except OSError:
             pass
-        save_version(version=about['__version__'])
 
         self.log('Building Source and Wheel (universal) distribution¡­')
         os.system(f'{sys.executable} setup.py sdist bdist_wheel --universal')
         self.log('Building Source and Wheel (universal) distribution¡­')
+
+        self.log(f"±£´æ°æ±¾ºÅ: {about['__version__']}")
+        save_version(version=about['__version__'])
+
         os.system(f'{sys.executable} setup.py sdist build')
 
         self.log('Uploading the package to PyPI via Twine¡­')
