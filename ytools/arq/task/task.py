@@ -87,20 +87,20 @@ class Task:
             self.result.cancel()
         return result
 
-    async def set_status(self, data=None, status_name="status", expire_time=None):
-        status_queue = self.client.get_queue(status_name, base=self.result_queue)
+    async def set_status(self, status_name, data=None, expire_time=None):
+        status_queue = self.client.get_queue(status_name, base=self.client.status_queue)
         expire_time = expire_time or setting.EXPIRE_TIME
         if data is not None:
             await self.client.redis.set(status_queue, data, ex=expire_time)
         if await self.client.redis.exists(status_name):
             await self.client.redis.expire(status_queue, expire_time)
 
-    async def get_status(self, status_name="status"):
-        status_queue = self.client.get_queue(status_name, base=self.result_queue)
+    async def get_status(self, status_name):
+        status_queue = self.client.get_queue(status_name, base=self.client.status_queue)
         return await self.client.redis.get(status_queue)
 
-    async def del_status(self, status_name="status"):
-        status_queue = self.client.get_queue(status_name, base=self.result_queue)
+    async def del_status(self, status_name):
+        status_queue = self.client.get_queue(status_name, base=self.client.status_queue)
         return await self.client.redis.delete(status_queue)
 
 

@@ -20,6 +20,7 @@ class BaseClient:
     tasks_queue: str
     data_queue: str
     result_queue: str
+    status_queue: str
 
     def __init__(
             self,
@@ -37,6 +38,7 @@ class BaseClient:
         self.tasks_queue = self.get_queue("tasks")
         self.data_queue = self.get_queue("data")
         self.result_queue = self.get_queue("result")
+        self.status_queue = self.get_queue("status")
 
     def get_queue(self, *queue: str, base=None):
         return self.split.join([base or self.queue_name, *queue])
