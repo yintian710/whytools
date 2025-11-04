@@ -30,7 +30,7 @@ AUTHOR = 'yintian'
 REQUIRES_PYTHON = '>=3.8.0'
 logger.error(f"!!!!!!")
 if len(sys.argv) == 1:
-    VERSION = update_version()
+    VERSION = update_version(update_type="minor")
 else:
     VERSION = get_version()
 
