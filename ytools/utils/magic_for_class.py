@@ -6,7 +6,6 @@
 @Software: PyCharm
 @Desc    : 
 """
-import functools
 import inspect
 import json
 
@@ -117,5 +116,19 @@ class Empty(metaclass=CustomMeta, singleton=True):
 
     def __repr__(self):
         return "empty"
+
+    # ✅ 支持异步 await
+    def __await__(self):
+        async def _noop():
+            return self
+
+        return _noop().__await__()
+
+    # ✅ 可选: 支持异步上下文
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
 
     __str__ = __repr__
