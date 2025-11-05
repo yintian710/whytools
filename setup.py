@@ -28,7 +28,6 @@ URL = 'https://github.com/yintian710/whytools'
 EMAIL = 'yintian710@gmail.com'
 AUTHOR = 'yintian'
 REQUIRES_PYTHON = '>=3.8.0'
-logger.error(f"!!!!!!")
 if len(sys.argv) == 1:
     VERSION = update_version()
 else:
