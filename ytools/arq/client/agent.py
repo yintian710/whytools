@@ -22,8 +22,9 @@ class Agent(BaseClient):
     def __init__(self, worker: Callable[[Task], Any], max_concurrency=None, **kwargs):
         self.worker = worker
         super().__init__(**kwargs)
+        self.success_tasks = FastWriteCounter()
         self.extra = {
-            "success_tasks": FastWriteCounter(),
+            "success_tasks": self.success_tasks.value,
         }
         if max_concurrency:
             self.context = asyncio.Semaphore(max_concurrency)
@@ -37,7 +38,8 @@ class Agent(BaseClient):
             except Exception as e:
                 res = f"ERROR::{type(e)}|{str(e)}"
             await self.put_result(res, task)
-            self.extra["success_tasks"].increment()
+            self.success_tasks.increment()
+            self.extra["success_tasks"] = self.success_tasks.value
             if task.callback:
                 asyncio.create_task(self.callback(task, res))
 
