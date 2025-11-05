@@ -14,6 +14,7 @@ from ytools import logger
 from ytools.arq import setting
 from ytools.arq.client.base import BaseClient
 from ytools.arq.task.task import Task
+from ytools.utils import magic
 
 
 class Agent(BaseClient):
@@ -32,6 +33,20 @@ class Agent(BaseClient):
             except Exception as e:
                 res = f"ERROR::{type(e)}|{str(e)}"
             await self.put_result(res, task)
+            if task.callback:
+                asyncio.create_task(self.callback(task, res))
+
+    @staticmethod
+    async def callback(task: Task, res):
+        try:
+            pre = magic.prepare(task.callback, task=task, res=res, result=res)
+            if pre.is_async:
+                await pre()
+            else:
+                pre()
+
+        except Exception as e:
+            logger.error(f"执行 callback 报错: {e}")
 
     async def run(self):
         while True:

@@ -10,6 +10,7 @@ import asyncio
 import json
 from asyncio import Future
 from itertools import count
+from typing import Callable
 from uuid import uuid4
 
 from ytools.arq import setting
@@ -19,6 +20,7 @@ from ytools.utils.encrypt import SaltBase64
 
 class Task:
     _score = count()
+    callback: Callable = None
     result: Future | None = None
 
     def __init__(self, data, client, task_id=None, result_queue="", fmt=False, **kwargs):
@@ -28,7 +30,9 @@ class Task:
         self.task_id = task_id or str(uuid4())
         self.client = client
         self.result_queue = result_queue
-        self.score = kwargs.get('score') or next(Task._score)
+        self.score = kwargs.pop('score', 0) or next(Task._score)
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
     def encode_data(self, data=None):
         data = data or self.data
