@@ -9,6 +9,7 @@
 import asyncio
 import json
 
+from ytools.utils.counter import FastWriteCounter
 from ytools.utils.host_ip import get_local_ip
 from ytools.utils.magic import require
 
@@ -31,13 +32,22 @@ class BaseClient:
             queue_name=None,
             redis=None
     ):
-        self.info = {}
+        self.task_count = FastWriteCounter()
+        self.extra = {}
         self.set_queue(queue_name)
         if isinstance(redis, dict):
             self.redis = self.make_redis(**redis)
         elif redis:
             self.redis = redis
         asyncio.create_task(self.heartbeat())
+
+    @property
+    def info(self):
+        return {
+            "host_ip": get_local_ip(),
+            "task_count": self.task_count.value,
+            **self.extra
+        }
 
     def set_queue(self, queue_name):
         self.queue_name = queue_name or setting.DEFAULT_QUEUE_NAME

@@ -15,12 +15,16 @@ from ytools.arq import setting
 from ytools.arq.client.base import BaseClient
 from ytools.arq.task.task import Task
 from ytools.utils import magic
+from ytools.utils.counter import FastWriteCounter
 
 
 class Agent(BaseClient):
     def __init__(self, worker: Callable[[Task], Any], max_concurrency=None, **kwargs):
         self.worker = worker
         super().__init__(**kwargs)
+        self.extra = {
+            "success_tasks": FastWriteCounter(),
+        }
         if max_concurrency:
             self.context = asyncio.Semaphore(max_concurrency)
         else:
@@ -33,6 +37,7 @@ class Agent(BaseClient):
             except Exception as e:
                 res = f"ERROR::{type(e)}|{str(e)}"
             await self.put_result(res, task)
+            self.extra["success_tasks"].increment()
             if task.callback:
                 asyncio.create_task(self.callback(task, res))
 
@@ -54,6 +59,7 @@ class Agent(BaseClient):
                 task: Task = await self.get_task()
                 if not task:
                     continue
+                self.task_count.increment()
                 asyncio.create_task(self.do(task))
             finally:
                 await asyncio.sleep(setting.INTERVAL)
@@ -89,6 +95,7 @@ class Agent(BaseClient):
         result_queue = self.get_queue(task.task_id, base=self.result_queue)
         data = task.encode_data(result)
         await self.redis.publish(result_queue, data)
+
 
 if __name__ == '__main__':
     pass

@@ -32,6 +32,7 @@ class Client(BaseClient):
             results = await pipe.execute()
             if not all(results):  # 检查是否有命令失败
                 raise ValueError(f"投放任务至队列失败: {results}")
+            self.task_count.increment()
         # add_res = await self.redis.zadd(self.tasks_queue, {task.task_id: task.score})
         # data_res = await self.redis.set(data_queue, task.encode_data(), ex=setting.EXPIRE_TIME)
         # results = {
