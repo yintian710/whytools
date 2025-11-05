@@ -6,6 +6,10 @@
 @Software: PyCharm
 @Desc    : 
 """
+import asyncio
+import json
+
+from ytools.utils.host_ip import get_local_ip
 from ytools.utils.magic import require
 
 require("redis")
@@ -27,11 +31,13 @@ class BaseClient:
             queue_name=None,
             redis=None
     ):
+        self.info = {}
         self.set_queue(queue_name)
         if isinstance(redis, dict):
             self.redis = self.make_redis(**redis)
         elif redis:
             self.redis = redis
+        asyncio.create_task(self.heartbeat())
 
     def set_queue(self, queue_name):
         self.queue_name = queue_name or setting.DEFAULT_QUEUE_NAME
@@ -73,6 +79,13 @@ class BaseClient:
     async def del_status(self, status_id):
         status_queue = self.get_queue(status_id, base=self.status_queue)
         return await self.redis.delete(status_queue)
+
+    async def heartbeat(self):
+        h_key = self.get_queue(self.__class__.__name__.lower(), get_local_ip(), base=self.queue_name)
+        interval = 5
+        while True:
+            await self.redis.set(h_key, value=json.dumps(self.info), ex=interval + 1)
+            await asyncio.sleep(interval)
 
 
 if __name__ == '__main__':
