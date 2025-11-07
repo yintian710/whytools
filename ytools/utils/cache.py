@@ -7,17 +7,17 @@
 """
 import threading
 import time
-from itertools import count
-from typing import Any, Optional
+from typing import Any
 
-from ytools import logger
 from ytools.utils.cache_utils import CacheItem
-from ytools.utils.date import Arrow
-
 
 
 class CacheManager(dict):
-    def __init__(self, *args, **kwargs):
+    def __init__(
+            self,
+            *args,
+            **kwargs
+    ):
         self.default_expire_time = kwargs.pop('expire_time', None)
         self.default_max_count = kwargs.pop('max_count', None)
         super().__init__(*args, **kwargs)
