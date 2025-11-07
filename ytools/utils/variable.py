@@ -9,7 +9,7 @@
 import builtins
 import time
 from threading import Lock, local
-from typing import Dict, Any, Type
+from typing import Dict, Any, Type, Optional
 
 
 class CacheItem:
@@ -43,6 +43,201 @@ class CacheItem:
 
     def __repr__(self):
         return f"<CacheItem [value: {self._value}| expired: {self.expired}]>"
+
+
+class TypedValue:
+    """
+    类型化值的代理类，支持延迟类型加载和类型检查
+
+    使用方式：G['int:a'] 会返回一个 TypedValue 实例
+    """
+
+    def __init__(self, parent: 'VariableG', var_name: str, type_path: str):
+        """
+        :param parent: 父 VariableG 对象
+        :param var_name: 变量名
+        :param type_path: 类型路径，如 'int', 'collections.Counter', 'ytools.utils.counter.FastWriteCounter'
+        """
+        object.__setattr__(self, '_parent', parent)
+        object.__setattr__(self, '_var_name', var_name)
+        object.__setattr__(self, '_type_path', type_path)
+        object.__setattr__(self, '_type_cache', None)
+
+    def _get_type(self) -> Type:
+        """获取类型对象"""
+        if self._type_cache is None:
+            import sys
+            import importlib
+            import types
+
+            # 先尝试从 builtins 获取
+            if hasattr(builtins, self._type_path):
+                type_obj = getattr(builtins, self._type_path)
+                object.__setattr__(self, '_type_cache', type_obj)
+                return type_obj
+
+            # 检查 sys.modules
+            if self._type_path in sys.modules:
+                type_obj = sys.modules[self._type_path]
+                object.__setattr__(self, '_type_cache', type_obj)
+                return type_obj
+
+            # 分离模块路径和类名
+            if '.' in self._type_path:
+                module_path, class_name = self._type_path.rsplit('.', 1)
+
+                # 检查模块是否已加载
+                if module_path in sys.modules:
+                    module = sys.modules[module_path]
+                    if hasattr(module, class_name):
+                        type_obj = getattr(module, class_name)
+                        object.__setattr__(self, '_type_cache', type_obj)
+                        return type_obj
+
+            # 尝试使用 load_object
+            try:
+                from ytools.utils.magic import load_object
+                type_obj = load_object(self._type_path, strict=True)
+                object.__setattr__(self, '_type_cache', type_obj)
+                return type_obj
+            except:
+                pass
+
+            # 尝试导入
+            try:
+                if '.' in self._type_path:
+                    module_path, class_name = self._type_path.rsplit('.', 1)
+                    module = importlib.import_module(module_path)
+                    type_obj = getattr(module, class_name)
+                else:
+                    type_obj = importlib.import_module(self._type_path)
+                object.__setattr__(self, '_type_cache', type_obj)
+                return type_obj
+            except Exception as e:
+                raise ValueError(f"无法加载类型 '{self._type_path}': {e}")
+
+        return self._type_cache
+
+    def _get_value(self):
+        """获取实际值"""
+        current = self._parent._map.get(self._var_name)
+        type_cls = self._get_type()
+
+        if current is None or current.expired or current.update(use=False):
+            # 不存在或已过期，创建默认值
+            if current:
+                self._parent._map.pop(self._var_name, None)
+            try:
+                default_value = type_cls()
+                self._parent._map[self._var_name] = CacheItem(default_value)
+                return default_value
+            except Exception as e:
+                raise TypeError(f"无法创建类型 '{self._type_path}' 的默认实例: {e}")
+
+        # 检查类型
+        value = current.value
+        if not isinstance(value, type_cls):
+            raise TypeError(
+                f"变量 '{self._var_name}' 的类型不匹配: 期望 {type_cls.__name__}, "
+                f"实际 {type(value).__name__}"
+            )
+        return value
+
+    def _set_value(self, value):
+        """设置值并检查类型"""
+        type_cls = self._get_type()
+
+        # 检查现有值的类型
+        current = self._parent._map.get(self._var_name)
+        if current is not None and not current.expired:
+            if not isinstance(current.value, type_cls):
+                raise TypeError(
+                    f"变量 '{self._var_name}' 的类型不匹配: 期望 {type_cls.__name__}, "
+                    f"实际 {type(current.value).__name__}"
+                )
+
+        # 检查新值的类型
+        if not isinstance(value, type_cls):
+            raise TypeError(
+                f"设置的值类型不匹配: 期望 {type_cls.__name__}, "
+                f"实际 {type(value).__name__}"
+            )
+
+        self._parent._map[self._var_name] = CacheItem(value)
+
+    # 代理所有操作到实际值
+    def __getattr__(self, name):
+        return getattr(self._get_value(), name)
+
+    def __setattr__(self, name, value):
+        if name.startswith('_'):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self._get_value(), name, value)
+
+    def __repr__(self):
+        return repr(self._get_value())
+
+    def __str__(self):
+        return str(self._get_value())
+
+    # 支持各种运算符
+    def __add__(self, other):
+        return self._get_value() + other
+
+    def __radd__(self, other):
+        return other + self._get_value()
+
+    def __iadd__(self, other):
+        result = self._get_value() + other
+        self._set_value(result)
+        return self
+
+    def __sub__(self, other):
+        return self._get_value() - other
+
+    def __isub__(self, other):
+        result = self._get_value() - other
+        self._set_value(result)
+        return self
+
+    def __mul__(self, other):
+        return self._get_value() * other
+
+    def __imul__(self, other):
+        result = self._get_value() * other
+        self._set_value(result)
+        return self
+
+    def __eq__(self, other):
+        return self._get_value() == other
+
+    def __lt__(self, other):
+        return self._get_value() < other
+
+    def __le__(self, other):
+        return self._get_value() <= other
+
+    def __gt__(self, other):
+        return self._get_value() > other
+
+    def __ge__(self, other):
+        return self._get_value() >= other
+
+    def __len__(self):
+        return len(self._get_value())
+
+    def __getitem__(self, key):
+        return self._get_value()[key]
+
+    def __setitem__(self, key, value):
+        self._get_value()[key] = value
+
+    def __iter__(self):
+        return iter(self._get_value())
+
+    def __call__(self, *args, **kwargs):
+        return self._get_value()(*args, **kwargs)
 
 
 class TypedAccessor:
@@ -148,87 +343,94 @@ class TypedAccessor:
 
     def _try_load_type_path(self, path: str):
         """
-        尝试加载类型路径，如果成功返回 True，否则返回 False
+        智能识别类型路径，不进行实际导入，避免触发依赖问题
 
-        使用智能检测策略：
-        1. 优先检查已加载的模块
-        2. 使用 find_spec 检查模块文件是否存在
-        3. 如果类名首字母大写，更倾向于认为是类型路径
+        策略：
+        1. 检查 builtins
+        2. 检查 sys.modules（已加载的模块）
+        3. 使用 find_spec 检查文件系统（不导入）
+        4. 根据命名规则推断（大写开头可能是类）
 
         :param path: 类型路径
-        :return: 是否成功加载
+        :return: 是否是有效的类型路径
         """
         try:
-            # 先尝试从 builtins 获取
-            try:
-                getattr(builtins, path)
-                return True
-            except AttributeError:
-                pass
-
-            import importlib
             import importlib.util
             import sys
+            import os
 
-            # 优先检查完整路径是否在 sys.modules 中
+            # 先尝试从 builtins 获取
+            if hasattr(builtins, path):
+                return True
+
+            # 检查是否在 sys.modules 中（已加载）
             if path in sys.modules:
                 return True
 
-            # 如果是带点的路径，分离模块和类名
+            # 检查是否有子模块已加载（说明这个路径是有效的包）
+            prefix = path + '.'
+            for mod_name in sys.modules:
+                if mod_name.startswith(prefix):
+                    return True
+
+            # 如果包含点号，分离处理
             if '.' in path:
-                module_path, class_name = path.rsplit('.', 1)
+                parts = path.split('.')
 
-                # 检查模块是否已经加载
-                if module_path in sys.modules:
-                    module = sys.modules[module_path]
-                    # 检查类名是否存在
-                    if hasattr(module, class_name):
-                        return True
-                    # 如果模块已加载但没有这个属性，检查是否有子模块
-                    if (path + '.') in ''.join(sys.modules.keys()):
-                        # 有子模块，说明这个路径是有效的包/模块
-                        return True
-                    return False
+                # 尝试所有可能的分割点，从后往前
+                # 例如 ytools.utils.counter.FasterCounter:
+                # 先检查 ytools.utils.counter 是否是模块，FasterCounter 是否是类
+                for i in range(len(parts), 0, -1):
+                    module_path = '.'.join(parts[:i])
+                    remaining = parts[i:] if i < len(parts) else []
 
-                # 使用 find_spec 检查模块是否存在
-                try:
-                    spec = importlib.util.find_spec(module_path)
-                    if spec is None:
+                    # 检查模块路径是否已加载
+                    if module_path in sys.modules:
+                        if not remaining:
+                            return True
+                        # 检查剩余部分是否全部是有效的类型属性
+                        import inspect
+                        module = sys.modules[module_path]
+                        obj = module
+
+                        for idx, attr in enumerate(remaining):
+                            if hasattr(obj, attr):
+                                obj = getattr(obj, attr)
+                            else:
+                                # 属性不存在，只有大写开头的最后一个元素可能是未加载的类
+                                if attr[0].isupper() and idx == len(remaining) - 1:
+                                    return True
+                                return False
+
+                        # 所有属性都存在，检查最后一个是否是类型
+                        # 类、模块、callable 都算类型
+                        if inspect.isclass(obj) or inspect.ismodule(obj) or (callable(obj) and not inspect.ismethod(obj)):
+                            return True
+                        # 否则不是类型路径
                         return False
 
-                    # 如果类名首字母大写，很可能是类名，尝试导入验证
-                    if class_name[0].isupper():
-                        try:
-                            module = importlib.import_module(module_path)
-                            return hasattr(module, class_name)
-                        except (ImportError, ModuleNotFoundError, ValueError):
-                            # 导入失败但 spec 存在且类名大写，仍认为可能是有效路径
-                            return True
-                    else:
-                        # 类名小写，可能是子模块，尝试导入
-                        try:
-                            importlib.import_module(path)
-                            return True
-                        except (ImportError, ModuleNotFoundError, ValueError):
-                            return False
-                except (ImportError, ModuleNotFoundError, ValueError):
-                    return False
+                    # 使用 find_spec 检查模块文件是否存在（不导入）
+                    try:
+                        spec = importlib.util.find_spec(module_path)
+                        if spec is not None:
+                            # 模块文件存在
+                            if not remaining:
+                                return True
+                            # 有剩余部分，只有全是大写开头才认为是类型路径
+                            # 例如：ytools.utils.counter + FastWriteCounter 可以
+                            # 但 ytools.utils.counter + FastWriteCounter.c 不行
+                            if remaining and all(part[0].isupper() for part in remaining):
+                                return True
+                    except (ImportError, ModuleNotFoundError, ValueError, AttributeError):
+                        continue
+
+                return False
             else:
-                # 没有点号，说明是模块名
-                # 使用 find_spec 检查模块是否存在
+                # 单个名字，检查是否是模块
                 try:
                     spec = importlib.util.find_spec(path)
-                    if spec is None:
-                        return False
-
-                    # 尝试导入
-                    try:
-                        importlib.import_module(path)
-                        return True
-                    except (ImportError, ModuleNotFoundError, ValueError):
-                        # 模块存在但导入失败（可能缺少依赖），仍认为是有效路径
-                        return True
-                except (ImportError, ModuleNotFoundError, ValueError):
+                    return spec is not None
+                except (ImportError, ModuleNotFoundError, ValueError, AttributeError):
                     return False
         except Exception:
             return False
@@ -345,9 +547,25 @@ class VariableG:
         return self.__setitem__(key, value)
 
     def __setitem__(self, key, value):
-        self._map[key] = CacheItem(value)
+        # 支持 'type:varname' 格式
+        if isinstance(key, str) and ':' in key:
+            # 如果 value 是 TypedValue，说明是 += 等操作返回的，直接忽略即可
+            # 因为 TypedValue._set_value 已经在 __iadd__ 等方法中被调用了
+            if isinstance(value, TypedValue):
+                return
+            type_path, var_name = key.split(':', 1)
+            typed_value = TypedValue(self, var_name, type_path)
+            typed_value._set_value(value)
+        else:
+            self._map[key] = CacheItem(value)
 
     def __getitem__(self, key):
+        # 支持 'type:varname' 格式，返回 TypedValue 代理对象
+        if isinstance(key, str) and ':' in key:
+            type_path, var_name = key.split(':', 1)
+            return TypedValue(self, var_name, type_path)
+
+        # 普通键访问
         item = self._map.get(key)
         if item is None:
             return None
