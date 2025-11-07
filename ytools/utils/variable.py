@@ -15,12 +15,13 @@ from typing import Dict, Any, Type, Optional
 class CacheItem:
     expired = False
 
-    def __init__(self, value, max_count: int = 0, expire_ts: int = 0):
+    def __init__(self, value, max_count: int = 0, expire_ts: int = 0, type_path: Optional[str] = None):
         self._value = value
         self.start_time = time.time()
         self.max_count = max_count
         self.expire_ts = expire_ts
         self.use_count = 0
+        self.type_path = type_path  # 存储类型路径，用于类型检查
 
     @property
     def value(self):
@@ -129,7 +130,8 @@ class TypedValue:
                 self._parent._map.pop(self._var_name, None)
             try:
                 default_value = type_cls()
-                self._parent._map[self._var_name] = CacheItem(default_value)
+                # 创建带类型信息的 CacheItem
+                self._parent._map[self._var_name] = CacheItem(default_value, type_path=self._type_path)
                 return default_value
             except Exception as e:
                 raise TypeError(f"无法创建类型 '{self._type_path}' 的默认实例: {e}")
@@ -163,7 +165,8 @@ class TypedValue:
                 f"实际 {type(value).__name__}"
             )
 
-        self._parent._map[self._var_name] = CacheItem(value)
+        # 创建带类型信息的 CacheItem
+        self._parent._map[self._var_name] = CacheItem(value, type_path=self._type_path)
 
     # 代理所有操作到实际值
     def __getattr__(self, name):
@@ -530,7 +533,6 @@ class VariableG:
     def __init__(self):
         self._map: Dict[str, CacheItem] = {}
         self._lock = Lock()
-        self.__setitem__ = self.setattr
 
     def __getattr__(self, item):
         # 支持 _type 语法，如 G._int.a 表示类型感知访问
@@ -539,25 +541,42 @@ class VariableG:
             type_path = item[1:]
             return TypedAccessor(self, type_path)
 
+        # 普通属性访问，使用 __getitem__ 以支持类型化变量
         if item in self._map:
             return self[item]
         return None
+
+    def __setattr__(self, key, value):
+        # 拦截属性设置，让 G.x = value 也能使用类型检查
+        # 内部属性（_开头）直接设置
+        if key.startswith('_'):
+            object.__setattr__(self, key, value)
+        else:
+            self.__setitem__(key, value)
 
     def setattr(self, key, value):
         return self.__setitem__(key, value)
 
     def __setitem__(self, key, value):
+        # 如果 value 是 TypedValue，说明是 += 等操作返回的，直接忽略即可
+        # 因为 TypedValue._set_value 已经在 __iadd__ 等方法中被调用了
+        if isinstance(value, TypedValue):
+            return
+
         # 支持 'type:varname' 格式
         if isinstance(key, str) and ':' in key:
-            # 如果 value 是 TypedValue，说明是 += 等操作返回的，直接忽略即可
-            # 因为 TypedValue._set_value 已经在 __iadd__ 等方法中被调用了
-            if isinstance(value, TypedValue):
-                return
             type_path, var_name = key.split(':', 1)
             typed_value = TypedValue(self, var_name, type_path)
             typed_value._set_value(value)
         else:
-            self._map[key] = CacheItem(value)
+            # 普通键访问，检查是否已经被类型化
+            current = self._map.get(key)
+            if current and current.type_path:
+                # 已经被类型化，需要进行类型检查
+                typed_value = TypedValue(self, key, current.type_path)
+                typed_value._set_value(value)
+            else:
+                self._map[key] = CacheItem(value)
 
     def __getitem__(self, key):
         # 支持 'type:varname' 格式，返回 TypedValue 代理对象
@@ -572,6 +591,11 @@ class VariableG:
         if item.update(use=False):
             self._map.pop(key)
             return None
+
+        # 如果变量已经被类型化，返回 TypedValue 代理
+        if item.type_path:
+            return TypedValue(self, key, item.type_path)
+
         return item.value
 
     def set(self, key: str, value: Any, **kwargs):
