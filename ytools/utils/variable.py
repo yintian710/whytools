@@ -68,6 +68,10 @@ class TypedAccessor:
         :return: 类型对象
         """
         if self._type_cache is None:
+            import sys
+            import importlib
+            import types
+
             # 先尝试从 builtins 获取
             try:
                 type_obj = getattr(builtins, self._type_path)
@@ -76,6 +80,43 @@ class TypedAccessor:
             except AttributeError:
                 pass
 
+            # 检查是否已经在 sys.modules 中
+            if self._type_path in sys.modules:
+                type_obj = sys.modules[self._type_path]
+                object.__setattr__(self, '_type_cache', type_obj)
+                return type_obj
+
+            # 如果路径包含点号，分离模块和类名
+            if '.' in self._type_path:
+                module_path, class_name = self._type_path.rsplit('.', 1)
+
+                # 检查模块是否已加载
+                if module_path in sys.modules:
+                    module = sys.modules[module_path]
+                    if hasattr(module, class_name):
+                        type_obj = getattr(module, class_name)
+                        object.__setattr__(self, '_type_cache', type_obj)
+                        return type_obj
+
+            # 检查是否有子模块已加载（可以推断父模块/包存在）
+            # 例如：如果 ytools.utils.counter 已加载，那么 ytools 和 ytools.utils 也应该可访问
+            prefix = self._type_path + '.'
+            for mod_name in sys.modules:
+                if mod_name.startswith(prefix):
+                    # 找到子模块，需要创建所有缺失的父模块
+                    parts = self._type_path.split('.')
+                    for i in range(len(parts)):
+                        partial_path = '.'.join(parts[:i+1])
+                        if partial_path not in sys.modules:
+                            parent_mod = types.ModuleType(partial_path)
+                            parent_mod.__package__ = partial_path if i < len(parts) - 1 else '.'.join(parts[:i])
+                            sys.modules[partial_path] = parent_mod
+
+                    # 返回请求的模块
+                    type_obj = sys.modules[self._type_path]
+                    object.__setattr__(self, '_type_cache', type_obj)
+                    return type_obj
+
             # 使用 load_object 加载
             try:
                 # 延迟导入以避免循环依赖
@@ -83,9 +124,8 @@ class TypedAccessor:
                 type_obj = load_object(self._type_path, strict=True)
                 object.__setattr__(self, '_type_cache', type_obj)
                 return type_obj
-            except ImportError:
-                # 如果无法导入 magic，尝试手动解析
-                import importlib
+            except (ImportError, Exception) as load_obj_error:
+                # 如果 load_object 失败，尝试手动解析
                 try:
                     if '.' in self._type_path:
                         module_path, class_name = self._type_path.rsplit('.', 1)
@@ -96,15 +136,24 @@ class TypedAccessor:
                     object.__setattr__(self, '_type_cache', type_obj)
                     return type_obj
                 except Exception as e:
-                    raise ValueError(f"无法加载类型 '{self._type_path}': {e}")
-            except Exception as e:
-                raise ValueError(f"无法加载类型 '{self._type_path}': {e}")
+                    # 提供更详细的错误信息
+                    raise ValueError(
+                        f"无法加载类型 '{self._type_path}'\n"
+                        f"  - load_object 错误: {load_obj_error}\n"
+                        f"  - importlib 错误: {e}\n"
+                        f"提示：请确保模块已安装且所有依赖满足，或先手动导入模块"
+                    )
 
         return self._type_cache
 
     def _try_load_type_path(self, path: str):
         """
         尝试加载类型路径，如果成功返回 True，否则返回 False
+
+        使用智能检测策略：
+        1. 优先检查已加载的模块
+        2. 使用 find_spec 检查模块文件是否存在
+        3. 如果类名首字母大写，更倾向于认为是类型路径
 
         :param path: 类型路径
         :return: 是否成功加载
@@ -117,16 +166,70 @@ class TypedAccessor:
             except AttributeError:
                 pass
 
-            # 使用手动解析
             import importlib
+            import importlib.util
+            import sys
+
+            # 优先检查完整路径是否在 sys.modules 中
+            if path in sys.modules:
+                return True
+
+            # 如果是带点的路径，分离模块和类名
             if '.' in path:
                 module_path, class_name = path.rsplit('.', 1)
-                module = importlib.import_module(module_path)
-                getattr(module, class_name)
-                return True
+
+                # 检查模块是否已经加载
+                if module_path in sys.modules:
+                    module = sys.modules[module_path]
+                    # 检查类名是否存在
+                    if hasattr(module, class_name):
+                        return True
+                    # 如果模块已加载但没有这个属性，检查是否有子模块
+                    if (path + '.') in ''.join(sys.modules.keys()):
+                        # 有子模块，说明这个路径是有效的包/模块
+                        return True
+                    return False
+
+                # 使用 find_spec 检查模块是否存在
+                try:
+                    spec = importlib.util.find_spec(module_path)
+                    if spec is None:
+                        return False
+
+                    # 如果类名首字母大写，很可能是类名，尝试导入验证
+                    if class_name[0].isupper():
+                        try:
+                            module = importlib.import_module(module_path)
+                            return hasattr(module, class_name)
+                        except (ImportError, ModuleNotFoundError, ValueError):
+                            # 导入失败但 spec 存在且类名大写，仍认为可能是有效路径
+                            return True
+                    else:
+                        # 类名小写，可能是子模块，尝试导入
+                        try:
+                            importlib.import_module(path)
+                            return True
+                        except (ImportError, ModuleNotFoundError, ValueError):
+                            return False
+                except (ImportError, ModuleNotFoundError, ValueError):
+                    return False
             else:
-                importlib.import_module(path)
-                return True
+                # 没有点号，说明是模块名
+                # 使用 find_spec 检查模块是否存在
+                try:
+                    spec = importlib.util.find_spec(path)
+                    if spec is None:
+                        return False
+
+                    # 尝试导入
+                    try:
+                        importlib.import_module(path)
+                        return True
+                    except (ImportError, ModuleNotFoundError, ValueError):
+                        # 模块存在但导入失败（可能缺少依赖），仍认为是有效路径
+                        return True
+                except (ImportError, ModuleNotFoundError, ValueError):
+                    return False
         except Exception:
             return False
 
