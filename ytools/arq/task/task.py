@@ -82,11 +82,15 @@ class Task:
 
         self.result = asyncio.ensure_future(get_result())
 
-    async def get_result(self, timeout=None):
+    async def get_result(self, timeout=None, timeout_back=None):
         if not self.result or self.result.cancelled():
             raise RuntimeError("未启动 ensure, 无法获取结果")
         try:
             result = await asyncio.wait_for(self.result, timeout=timeout)
+        except asyncio.TimeoutError:
+            if timeout_back:
+                await timeout_back()
+            raise
         finally:
             self.result.cancel()
         return result

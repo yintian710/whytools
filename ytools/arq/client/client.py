@@ -43,11 +43,11 @@ class Client(BaseClient):
         #     raise ValueError(f"投放任务至队列失败: {results}")
 
     @staticmethod
-    async def get_result(task: Task, timeout=None):
-        res = await task.get_result(timeout=timeout)
+    async def get_result(task: Task, timeout=None, timeout_back=None):
+        res = await task.get_result(timeout=timeout, timeout_back=timeout_back)
         return res
 
-    async def get_result_by_id(self, task_id, timeout=None):
+    async def get_result_by_id(self, task_id, timeout=None, timeout_back=None):
         result_queue = self.get_queue(task_id, base=self.result_queue)
         pubsub = self.redis.pubsub()
         await pubsub.subscribe(result_queue)
@@ -62,6 +62,10 @@ class Client(BaseClient):
             try:
                 res = await asyncio.wait_for(done_future, timeout=timeout)
                 return res
+            except asyncio.TimeoutError:
+                if timeout_back:
+                    await timeout_back()
+                raise
             finally:
                 done_future.cancel()
         finally:
