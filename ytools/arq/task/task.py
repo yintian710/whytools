@@ -7,6 +7,7 @@
 @Desc    : 
 """
 import asyncio
+import inspect
 import json
 from asyncio import Future
 from itertools import count
@@ -88,7 +89,9 @@ class Task:
         try:
             result = await asyncio.wait_for(self.result, timeout=timeout)
         except asyncio.TimeoutError:
-            if timeout_back:
+            if inspect.iscoroutine(timeout_back):
+                await timeout_back
+            else:
                 await timeout_back()
             raise
         finally:

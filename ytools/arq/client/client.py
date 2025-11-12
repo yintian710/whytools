@@ -7,6 +7,7 @@
 @Desc    : 
 """
 import asyncio
+import inspect
 from uuid import uuid4
 
 from ytools.arq import setting
@@ -64,7 +65,10 @@ class Client(BaseClient):
                 return res
             except asyncio.TimeoutError:
                 if timeout_back:
-                    await timeout_back()
+                    if inspect.iscoroutine(timeout_back):
+                        await timeout_back
+                    else:
+                        await timeout_back()
                 raise
             finally:
                 done_future.cancel()
