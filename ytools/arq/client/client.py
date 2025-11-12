@@ -64,11 +64,12 @@ class Client(BaseClient):
                 res = await asyncio.wait_for(done_future, timeout=timeout)
                 return res
             except asyncio.TimeoutError:
-                if timeout_back:
-                    if inspect.iscoroutine(timeout_back):
-                        await timeout_back
-                    else:
-                        await timeout_back()
+                if inspect.iscoroutinefunction(timeout_back):
+                    await timeout_back()
+                elif inspect.isawaitable(timeout_back):
+                    await timeout_back
+                else:
+                    timeout_back()
                 raise
             finally:
                 done_future.cancel()

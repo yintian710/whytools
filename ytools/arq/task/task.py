@@ -89,10 +89,12 @@ class Task:
         try:
             result = await asyncio.wait_for(self.result, timeout=timeout)
         except asyncio.TimeoutError:
-            if inspect.iscoroutine(timeout_back):
+            if inspect.iscoroutinefunction(timeout_back):
+                await timeout_back()
+            elif inspect.isawaitable(timeout_back):
                 await timeout_back
             else:
-                await timeout_back()
+                timeout_back()
             raise
         finally:
             self.result.cancel()
