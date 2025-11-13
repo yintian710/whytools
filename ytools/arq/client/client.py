@@ -68,7 +68,7 @@ class Client(BaseClient):
                     await timeout_back()
                 elif inspect.isawaitable(timeout_back):
                     await timeout_back
-                else:
+                elif timeout_back:
                     timeout_back()
                 raise
             finally:
