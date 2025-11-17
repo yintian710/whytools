@@ -7,6 +7,7 @@
 """
 import time
 from collections.abc import Callable
+from datetime import datetime
 from typing import Literal
 
 from ytools.utils.magic import require
@@ -38,7 +39,7 @@ T_FRAMES = Literal[
 ]
 
 
-class Arrow(_Arrow):
+class Arrow(_Arrow, datetime):
 
     @classmethod
     def get(
