@@ -92,6 +92,7 @@ class Agent(BaseClient):
         result = None
         if (await self.redis.info("server")).get("redis_version", "0.0.0") >= "5.0.0":
             result = await self.redis.zpopmin(self.tasks_queue, count=1)
+            result = result and result[0]
         else:
             async with self.redis.pipeline(transaction=True) as pipe:
                 # 取出最小分数的任务
