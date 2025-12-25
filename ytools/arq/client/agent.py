@@ -89,12 +89,16 @@ class Agent(BaseClient):
         )
 
     async def zpop(self, key: str):
-        async with self.redis.pipeline(transaction=True) as pipe:
-            # 取出最小分数的任务
-            await pipe.zrange(key, 0, 0, withscores=False)
-            # 删除它
-            await pipe.zremrangebyrank(key, 0, 0)
-            result, _ = await pipe.execute()
+        result = None
+        if (await self.redis.info("server")).get("redis_version", "0.0.0") >= "5.0.0":
+            result = await self.redis.zpopmin(self.tasks_queue, count=1)
+        else:
+            async with self.redis.pipeline(transaction=True) as pipe:
+                # 取出最小分数的任务
+                await pipe.zrange(key, 0, 0, withscores=False)
+                # 删除它
+                await pipe.zremrangebyrank(key, 0, 0)
+                result, _ = await pipe.execute()
 
         if result:
             return result[0].decode() if isinstance(result[0], bytes) else result[0]
