@@ -8,6 +8,7 @@
 """
 import asyncio
 import contextlib
+from asyncio import Event
 from typing import Callable, Any
 
 from ytools import logger
@@ -55,9 +56,12 @@ class Agent(BaseClient):
         except Exception as e:
             logger.error(f"执行 callback 报错: {e}")
 
-    async def run(self):
+    async def run(self, event: Event = None):
         while True:
             try:
+                if event and event.is_set():
+                    await asyncio.sleep(setting.INTERVAL)
+                    continue
                 task: Task = await self.get_task()
                 if not task:
                     continue
