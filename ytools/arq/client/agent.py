@@ -71,10 +71,7 @@ class Agent(BaseClient):
                 await asyncio.sleep(setting.INTERVAL)
 
     async def get_task(self):
-        if (await self.redis.info("server")).get("redis_version", "0.0.0") >= "5.0.0":
-            task_id = await self.redis.zpopmin(self.tasks_queue, count=1)
-        else:
-            task_id = await self.zpop(self.tasks_queue)
+        task_id = await self.zpop(self.tasks_queue)
         if not task_id:
             return None
         data = await self.redis.get(self.get_queue(task_id, base=self.data_queue))
