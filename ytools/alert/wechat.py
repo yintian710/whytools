@@ -67,7 +67,7 @@ def send_wechat(content: str, to: list, at: list = None, msg_type: msg_type_lite
         msg_type: 消息类型，支持 "text" 和 "markdown"，默认为 "text"
     """
 
-    require("request", action="fix")
+    require("requests", action="fix")
     import requests  # noqa
     payload = {
         "msgtype": msg_type,
@@ -99,6 +99,33 @@ def send_wechat(content: str, to: list, at: list = None, msg_type: msg_type_lite
                     logger.error(f"[企业微信]发送失败！错误码：{result.get('errcode')}，错误信息：{result.get('errmsg')}")
         except Exception as e:
             logger.error(f"[企业微信]发送失败！原因：{e}")
+
+
+def fmt_msg(*rows, msg: str | list = "", title: str = "Ark 微信通知", at: list = None, index=True, level: Literal["comment", "warning", "info"] = "info"):
+    msg = msg if isinstance(msg, list) else [msg]
+    msg = [f"# <font color=\"{level}\">{title}</font>\n", "\n", *msg, "\n"]
+
+    for row in rows:
+        msg.append("\n" +
+                   "\n".join(
+                       [f">{f'{_index + 1}. ' if index else ''}{item[0]}: <font color=\"comment\">{item[1]}</font>" for _index, item in
+                        enumerate(row.items())]
+                   )
+                   + "\n")
+    if at:
+        msg.append(f"\n\n {' '.join([f'<@{_at}>' for _at in at])}")
+    content = ''.join(msg)
+    return content
+
+
+def send_msg(*rows, to: list, msg: str | list = "", title: str = "微信通知", at: list = None, index=True, level: Literal["comment", "warning", "info"] = "info"):
+    content = fmt_msg(*rows, msg=msg, title=title, at=at, index=index, level=level)
+    send_wechat(content=content, to=to, msg_type="markdown")
+
+
+async def async_send_msg(*rows, to: list, msg: str | list = "", title: str = "微信通知", at: list = None, index=True, level: Literal["comment", "warning", "info"] = "info"):
+    content = fmt_msg(*rows, msg=msg, title=title, at=at, index=index, level=level)
+    await async_send_wechat(content=content, to=to, msg_type="markdown")
 
 
 if __name__ == '__main__':
