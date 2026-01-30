@@ -6,10 +6,12 @@
 @Software: PyCharm
 @Desc    :
 """
+import asyncio
 import builtins
 import time
 from threading import Lock, local
 from typing import Dict, Any, Type, Optional
+from weakref import WeakKeyDictionary
 
 
 class CacheItem:
@@ -304,7 +306,7 @@ class TypedAccessor:
                     # 找到子模块，需要创建所有缺失的父模块
                     parts = self._type_path.split('.')
                     for i in range(len(parts)):
-                        partial_path = '.'.join(parts[:i+1])
+                        partial_path = '.'.join(parts[:i + 1])
                         if partial_path not in sys.modules:
                             parent_mod = types.ModuleType(partial_path)
                             parent_mod.__package__ = partial_path if i < len(parts) - 1 else '.'.join(parts[:i])
@@ -631,3 +633,36 @@ class VariableT(local, VariableG):
 
     def __repr__(self):
         return f"<VariableT [map: {self._map}]>"
+
+
+class VariableC(VariableG):
+    """协程级别的变量隔离，基于 asyncio.current_task() 实现，自动清理已完成任务的数据"""
+
+    def __init__(self):  # noqa
+        # 使用弱引用字典存储每个任务的数据：{task: {key: CacheItem}}
+        # 任务完成后，如果没有其他引用，会自动从字典中删除，避免内存泄漏
+        self._task_maps: WeakKeyDictionary = WeakKeyDictionary()
+        self._lock = None
+
+    @property
+    def _map(self) -> Dict[str, CacheItem]:
+        """获取当前协程任务的数据字典"""
+        task = asyncio.current_task()
+        if task is None:
+            # 如果不在 asyncio 上下文中，返回一个临时字典
+            return {}
+
+        if task not in self._task_maps:
+            self._task_maps[task] = {}
+        return self._task_maps[task]
+
+    def __enter__(self):
+        # 协程不需要锁
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # 协程不需要锁
+        pass
+
+    def __repr__(self):
+        return f"<VariableC [task_maps: {len(self._task_maps)} tasks]>"
