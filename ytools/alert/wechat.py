@@ -101,7 +101,7 @@ def send_wechat(content: str, to: list, at: list = None, msg_type: msg_type_lite
             logger.error(f"[企业微信]发送失败！原因：{e}")
 
 
-def fmt_msg(*rows, msg: str | list = "", title: str = "Ark 微信通知", at: list = None, index=True, level: Literal["comment", "warning", "info"] = "info"):
+def fmt_msg(*rows, msg: str | list = "", title: str = "微信通知", at: list = None, index=True, level: Literal["comment", "warning", "info"] = "info"):
     msg = msg if isinstance(msg, list) else [msg]
     msg = [f"# <font color=\"{level}\">{title}</font>\n", "\n", *msg, "\n"]
 
