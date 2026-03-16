@@ -9,6 +9,7 @@
 import asyncio
 import json
 
+from ytools import logger as default_logger
 from ytools.utils.counter import FastWriteCounter
 from ytools.utils.host_ip import get_local_ip
 from ytools.utils.magic import require
@@ -30,10 +31,15 @@ class BaseClient:
     def __init__(
             self,
             queue_name=None,
-            redis=None
+            redis=None,
+            logger=None,
+            level="info",
     ):
         self.task_count = FastWriteCounter()
         self.extra = {}
+        self.logger = logger or default_logger
+        self.level = (level or "info").lower()
+        self._host_ip = None
         self.set_queue(queue_name)
         if isinstance(redis, dict):
             self.redis = self.make_redis(**redis)
@@ -46,7 +52,7 @@ class BaseClient:
     @property
     def info(self):
         return {
-            "host_ip": get_local_ip(),
+            "host_ip": self.get_host_ip(),
             "task_count": self.task_count.value,
             **self.extra
         }
@@ -60,6 +66,25 @@ class BaseClient:
 
     def get_queue(self, *queue: str, base=None):
         return self.split.join([base or self.queue_name, *queue])
+
+    def log(self, message, level=None, *args, **kwargs):
+        level = (level or self.level or "info").lower()
+        logger_func = getattr(self.logger, level, None)
+        if callable(logger_func):
+            return logger_func(message, *args, **kwargs)
+        logger_func = getattr(self.logger, "info", None)
+        if callable(logger_func):
+            return logger_func(message, *args, **kwargs)
+
+    def get_host_ip(self):
+        if self._host_ip:
+            return self._host_ip
+        try:
+            self._host_ip = get_local_ip()
+        except Exception as e:
+            self.log(f"获取内网IP失败: {e}", level="error")
+            self._host_ip = "unknown"
+        return self._host_ip
 
     @classmethod
     def make_redis(
@@ -93,9 +118,9 @@ class BaseClient:
         return await self.redis.delete(status_queue)
 
     async def heartbeat(self):
-        h_key = self.get_queue(self.__class__.__name__.lower(), get_local_ip(), base=self.queue_name)
         interval = 5
         while True:
+            h_key = self.get_queue(self.__class__.__name__.lower(), self.get_host_ip(), base=self.queue_name)
             await self.redis.set(h_key, value=json.dumps(self.info), ex=interval + 1)
             await asyncio.sleep(interval)
 

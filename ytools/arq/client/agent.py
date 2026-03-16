@@ -8,10 +8,10 @@
 """
 import asyncio
 import contextlib
+import inspect
 from asyncio import Event
 from typing import Callable, Any
 
-from ytools import logger
 from ytools.arq import setting
 from ytools.arq.client.base import BaseClient
 from ytools.arq.task.task import Task
@@ -20,9 +20,9 @@ from ytools.utils.counter import FastWriteCounter
 
 
 class Agent(BaseClient):
-    def __init__(self, worker: Callable[[Task], Any], max_concurrency=None, **kwargs):
-        self.worker = worker
+    def __init__(self, worker: Callable[[Task], Any] | None = None, max_concurrency=None, **kwargs):
         super().__init__(**kwargs)
+        self.worker = worker or self.run_task
         self.success_tasks = FastWriteCounter()
         self.extra = {
             "success_tasks": self.success_tasks.value,
@@ -35,8 +35,11 @@ class Agent(BaseClient):
     async def do(self, task):
         async with self.context:
             try:
-                res = await self.worker(task)
+                res = self.worker(task)
+                if inspect.isawaitable(res):
+                    res = await res
             except Exception as e:
+                self.log(f"执行任务失败 task_id={task.task_id}: {type(e).__name__}: {e}", level="error")
                 res = f"ERROR::{type(e)}|{str(e)}"
             await self.put_result(res, task)
             self.success_tasks.increment()
@@ -44,8 +47,46 @@ class Agent(BaseClient):
             if task.callback:
                 asyncio.create_task(self.callback(task, res))
 
+    async def run_task(self, task: Task):
+        payload = task.data
+        if isinstance(payload, (str, bytes)):
+            with contextlib.suppress(Exception):
+                payload = task.decode_data()
+        self.log(f"收到任务 task_id={task.task_id}: {payload}")
+        result = await self.execute_task(task, payload)
+        self.log(f"任务结果 task_id={task.task_id}: {result}")
+        return result
+
     @staticmethod
-    async def callback(task: Task, res):
+    def normalize_task_payload(payload):
+        if not isinstance(payload, dict):
+            return None
+        func = payload.get("func")
+        if func is None:
+            return None
+        args = payload.get("args", ())
+        kwargs = payload.get("kwargs", {})
+        if not isinstance(args, (list, tuple)):
+            args = (args,)
+        if kwargs is None:
+            kwargs = {}
+        if not isinstance(kwargs, dict):
+            raise TypeError("task kwargs 必须为 dict")
+        return func, tuple(args), kwargs
+
+    async def execute_task(self, task: Task, payload):
+        normalized = self.normalize_task_payload(payload)
+        if normalized is None:
+            return payload
+        func, args, kwargs = normalized
+        return await magic.async_result(
+            func,
+            args=args,
+            kwargs=kwargs,
+            namespace={"task": task},
+        )
+
+    async def callback(self, task: Task, res):
         try:
             pre = magic.prepare(task.callback, task=task, res=res, result=res)
             if pre.is_async:
@@ -54,7 +95,7 @@ class Agent(BaseClient):
                 pre()
 
         except Exception as e:
-            logger.error(f"执行 callback 报错: {e}")
+            self.log(f"执行 callback 报错: {e}", level="error")
 
     async def run(self, event: Event = None):
         while True:
@@ -76,7 +117,7 @@ class Agent(BaseClient):
             return None
         data = await self.redis.get(self.get_queue(task_id, base=self.data_queue))
         if data is None:
-            logger.error(f"task_id:{task_id} 未获取到数据")
+            self.log(f"task_id:{task_id} 未获取到数据", level="error")
             return None
         return Task(
             data=data,
