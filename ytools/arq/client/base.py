@@ -37,6 +37,8 @@ class BaseClient:
         self.set_queue(queue_name)
         if isinstance(redis, dict):
             self.redis = self.make_redis(**redis)
+        elif isinstance(redis, str):
+            self.redis = Redis.from_url(redis)
         elif redis:
             self.redis = redis
         asyncio.create_task(self.heartbeat())
