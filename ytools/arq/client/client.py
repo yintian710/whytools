@@ -57,6 +57,8 @@ class Client(BaseClient):
                     return True
                 else:
                     raise ValueError("超出最大任务数")
+            else:
+                return
 
     @staticmethod
     async def get_result(task: Task, timeout=None, timeout_back=None):
