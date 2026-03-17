@@ -35,9 +35,7 @@ class Agent(BaseClient):
     async def do(self, task):
         async with self.context:
             try:
-                res = self.worker(task)
-                if inspect.isawaitable(res):
-                    res = await res
+                res = await self.run_callable(self.worker, task)
             except Exception as e:
                 self.log(f"执行任务失败 task_id={task.task_id}: {type(e).__name__}: {e}", level="error")
                 res = f"ERROR::{type(e)}|{str(e)}"
@@ -46,6 +44,19 @@ class Agent(BaseClient):
             self.extra["success_tasks"] = self.success_tasks.value
             if task.callback:
                 asyncio.create_task(self.callback(task, res))
+
+    @staticmethod
+    def is_async_callable(func):
+        return inspect.iscoroutinefunction(func) or inspect.iscoroutinefunction(getattr(func, "__call__", None))
+
+    async def run_callable(self, func, *args, **kwargs):
+        pre = magic.prepare(func, *args, **kwargs)
+        if self.is_async_callable(pre.func):
+            return await pre()
+        res = await asyncio.to_thread(pre)
+        if inspect.isawaitable(res):
+            return await res
+        return res
 
     async def run_task(self, task: Task):
         payload = task.data
@@ -64,6 +75,7 @@ class Agent(BaseClient):
         func = payload.get("func")
         if func is None:
             return None
+        func = magic.load_object(func)
         args = payload.get("args", ())
         kwargs = payload.get("kwargs", {})
         if not isinstance(args, (list, tuple)):
@@ -79,12 +91,7 @@ class Agent(BaseClient):
         if normalized is None:
             return payload
         func, args, kwargs = normalized
-        return await magic.async_result(
-            func,
-            args=args,
-            kwargs=kwargs,
-            namespace={"task": task},
-        )
+        return await self.run_callable(func, *args, **kwargs, task=task)
 
     async def callback(self, task: Task, res):
         try:

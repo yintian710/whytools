@@ -13,8 +13,8 @@ from ytools.arq.client.client import Client
 
 async def main():
     client = Client(redis={"host": "10.238.60.107", "port": 6379, "db": 15, "password": "123456"})
-    task = await client.put({"1": 2})
-    res = await client.result(task, timeout=5)
+    task = await client.put({"1": 2}, auto_ensure=True)
+    res = await client.get_result(task, timeout=5)
     print(res)
 
 
