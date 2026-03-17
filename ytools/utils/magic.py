@@ -11,6 +11,7 @@ import inspect
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections import namedtuple
@@ -47,6 +48,10 @@ PYPI_MIRROR = {
 }
 
 
+def get_default_require_mode():
+    return "uv" if shutil.which("uv") else "pip"
+
+
 def require(
         package_spec: str,
         action: Literal["raise", "fix"] = "fix",
@@ -55,7 +60,7 @@ def require(
         mode=None
 ):
     kwargs = kwargs or {}
-    mode = mode or os.environ.get('$require_mode') or 'pip'
+    mode = mode or os.environ.get('$require_mode') or get_default_require_mode()
 
     package_spec = re.sub(r"\s+", "", package_spec)
     match = PACKAGE_REGEX.match(package_spec)
