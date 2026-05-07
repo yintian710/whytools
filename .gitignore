@@ -10,6 +10,8 @@ build
 dist
 venv
 
+
+file
 # Python
 __pycache__/
 *.py[cod]
