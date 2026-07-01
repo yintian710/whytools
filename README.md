@@ -37,7 +37,13 @@
 
 ### 本地开发安装
 
-推荐直接在项目目录安装：
+推荐直接用 `uv` 安装开发环境：
+
+```bash
+uv sync
+```
+
+如果你仍然使用 `pip`，也可以继续执行：
 
 ```bash
 python -m pip install -r requirements.txt
@@ -62,9 +68,9 @@ python -m pip install packaging redis arrow jmespath jsonpath lxml w3lib request
 
 ### 安装注意事项
 
-- 不要直接执行 `python setup.py`
-- 这个仓库里的 `setup.py` 在“无参数启动”时会进入打包上传逻辑
-- 正常使用请走 `pip install -e .`、`pip install .` 或构建工具链
+- 发布推荐执行 `python publish.py`
+- 构建底层走 `uv build` / `uv publish`
+- `setup.py` 仅保留给旧工具链做兼容入口，不再承担发布逻辑
 
 ## 快速开始
 
@@ -509,3 +515,28 @@ print(counter.value)
 0.2.24
 ```
 
+
+
+## 发布
+
+推荐使用项目根目录下的 `publish.py`：
+
+```bash
+python publish.py
+```
+
+常见参数：
+
+```bash
+python publish.py -t minor      # 升中版本后发布
+python publish.py -t pre@b      # 升 beta 版本后发布
+python publish.py -ts 0         # 跳过测试直接发布
+```
+
+脚本会按顺序执行：
+
+- `uv run pytest test/ --verbose`
+- 更新 `ytools/VERSION` 和 `pyproject.toml` 中的版本号
+- `uv build`
+- `uv publish`
+- 提交 git，并在正式版本时打 tag

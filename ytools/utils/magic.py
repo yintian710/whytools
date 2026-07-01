@@ -126,13 +126,13 @@ def require_cmd_by_uv(
 ):
     mirror_sources and uv_kwargs.setdefault("--default-index", mirror_sources)
 
-    try:
-        import uv  # noqa
-    except ImportError:
-        require("uv", mode="pip", action="fix")
-        import uv  # noqa
+    # try:
+    #     import uv  # noqa
+    # except ImportError:
+    #     require("uv", mode="pip", action="fix")
+    #     import uv  # noqa
 
-    cmd = [uv.find_uv_bin(), "add"]
+    cmd = ["uv", "add"]
     for k, v in uv_kwargs.items():
         k and cmd.append(k)
         v and cmd.append(v)

@@ -5,6 +5,11 @@
 @Author  : yintian
 @Desc    : 
 """
+from ytools.utils.magic import require
+
+require("DrissionPage")
+require("objprint")
+
 from DrissionPage._configs.chromium_options import ChromiumOptions
 from objprint import op
 
@@ -18,7 +23,7 @@ def b(**kwargs):
     op(kwargs["headers"])
 
 
-def test():
+def not_test():
     opt = ChromiumOptions()
     opt.set_argument(' --disable-web-security', "")
     opt.set_browser_path("a")

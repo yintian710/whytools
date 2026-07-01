@@ -385,7 +385,7 @@ def mock_res(response: RouteResponse):
     print(123)
 
 
-def test():
+def not_test():
     from DrissionPage._configs.chromium_options import ChromiumOptions  # noqa
     opt = ChromiumOptions()
     opt.set_argument(' --disable-web-security', "")
@@ -400,4 +400,4 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    not_test()
