@@ -2,6 +2,7 @@
 """Build and publish the project with uv."""
 import argparse
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -10,6 +11,13 @@ from ytools.version import is_main_version, update_version
 ROOT = Path(__file__).resolve().parent
 VERSION_FILE = ROOT / "ytools" / "VERSION"
 PYPROJECT_FILE = ROOT / "pyproject.toml"
+DIST_DIR = ROOT / "dist"
+
+
+def clean_dist() -> None:
+    if DIST_DIR.exists():
+        shutil.rmtree(DIST_DIR)
+        print("已清理旧的打包产物")
 
 
 def run(*args: str) -> None:
@@ -68,6 +76,7 @@ def main(update_type: str = "auto", test_success: int = 1) -> None:
         return
 
     new_version = deal_version(update_type)
+    clean_dist()
     run("uv", "build")
     run("uv", "publish")
     sync_git(new_version)
