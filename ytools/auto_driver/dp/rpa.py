@@ -103,7 +103,7 @@ class DpRpaBase(RPAControl):
         except Exception as e:
             logger.error(f'关闭浏览器失败, {e}', )
         try:
-            rm and shutil.rmtree(self._local_path)
+            rm and self._local_path and shutil.rmtree(self._local_path)
         except Exception as e:
             logger.error(f'删除浏览器本期文件失败, {e}')
 
