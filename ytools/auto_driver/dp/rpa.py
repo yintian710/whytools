@@ -81,6 +81,10 @@ class DpRpaBase(RPAControl):
     def set_tab(self, tab: typing.Optional[ChromiumTab]):
         self._tab = tab
 
+    @property
+    def is_none(self):
+        return self._tab is None and self._page is None
+
     def re_tab(self):
         try:
             logger.debug(f'关闭当前标签, 启动新标签')
@@ -101,9 +105,9 @@ class DpRpaBase(RPAControl):
             self.set_page(None)
             time.sleep(5)
         except Exception as e:
-            logger.error(f'关闭浏览器失败, {e}', )
+            logger.error(f'关闭浏览器失败, {e}')
         try:
-            rm and shutil.rmtree(self._local_path)
+            rm and self._local_path and shutil.rmtree(self._local_path)
         except Exception as e:
             logger.error(f'删除浏览器本期文件失败, {e}')
 
@@ -263,7 +267,7 @@ class DpRpaBase(RPAControl):
         self.call(*args, **kwargs)
 
     def __del__(self):
-        self.close()
+        not self.is_none and self.close()
 
 
 if __name__ == '__main__':
