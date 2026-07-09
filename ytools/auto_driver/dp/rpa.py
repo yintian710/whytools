@@ -217,11 +217,11 @@ class DpRpaBase(RPAControl):
         _res.append([distance, _res[-1][1]])
         return _res
 
-    def click(self, eles: typing.Union[typing.List[typing.Union[str, dict]], str, dict], index=0, page: ChromiumPage = None, one=True, error_type='ignore', try_count=3, sleep=3):
+    def click(self, eles: typing.Union[typing.List[typing.Union[str, dict]], str, dict], index=0, page: ChromiumPage = None, one=True, error_type='ignore', try_count=3, sleep=3, **kwargs):
         def click_one(_ele):
             try:
                 if r := self.find(_ele, index=index, page=page, one=True, error_type=error_type, try_count=1):
-                    return any([button.click() for button in iterable(r)])
+                    return any([button.click(**kwargs) for button in iterable(r)])
                 self.sleep()
             except Exception as e:
                 self.deal_error(e, error_type=error_type)
