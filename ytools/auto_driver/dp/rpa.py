@@ -111,7 +111,8 @@ class DpRpaBase(RPAControl):
         except Exception as e:
             logger.error(f'删除浏览器本期文件失败, {e}')
 
-    def find(self, eles: typing.Union[typing.List[typing.Union[str, dict]], str, dict], index=0, page: ChromiumPage = None, one=True, error_type='ignore', try_count=3) \
+    def find(self, eles: typing.Union[typing.List[typing.Union[str, dict]], str, dict], index=0,
+             page: ChromiumPage = None, one=True, error_type='ignore', try_count=3) \
             -> typing.Union[typing.List[ChromiumElement], ChromiumElement]:
         def find_one(_ele, _index, parent=None):
             try:
@@ -217,7 +218,8 @@ class DpRpaBase(RPAControl):
         _res.append([distance, _res[-1][1]])
         return _res
 
-    def click(self, eles: typing.Union[typing.List[typing.Union[str, dict]], str, dict], index=0, page: ChromiumPage = None, one=True, error_type='ignore', try_count=3, sleep=3, **kwargs):
+    def click(self, eles: typing.Union[typing.List[typing.Union[str, dict]], str, dict], index=0,
+              page: ChromiumPage = None, one=True, error_type='ignore', try_count=3, sleep=3, **kwargs):
         def click_one(_ele):
             try:
                 if r := self.find(_ele, index=index, page=page, one=True, error_type=error_type, try_count=1):
@@ -229,16 +231,20 @@ class DpRpaBase(RPAControl):
                 self.sleep(sleep)
 
         page = page or self.page
+        yes = False
         for ele in iterable(eles):
             flag = False
             for _ in range(try_count):
                 flag = click_one(ele)
                 if flag:
+                    yes = True
                     break
             if flag and one:
                 break
+        return yes
 
-    def input(self, eles: typing.Union[typing.List[typing.Union[str, dict]], str, dict], text: str, index=0, page: ChromiumPage = None, one=True, error_type='ignore', try_count=3):
+    def input(self, eles: typing.Union[typing.List[typing.Union[str, dict]], str, dict], text: str, index=0,
+              page: ChromiumPage = None, one=True, error_type='ignore', try_count=3):
 
         def input_one(_ele, _text, _index=0):
             try:
@@ -262,14 +268,17 @@ class DpRpaBase(RPAControl):
                 self.deal_error(e, error_type=error_type)
 
         page = page or self.page
+        yes = False
         for ele in iterable(eles):
             flag = False
             for _ in range(try_count):
                 flag = input_one(ele, text, index)
                 if flag:
+                    yes = True
                     break
             if flag and one:
                 break
+        return yes
 
     def quit(self):
         if self._page:
