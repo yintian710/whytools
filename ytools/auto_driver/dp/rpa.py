@@ -160,7 +160,7 @@ class DpRpaBase(RPAControl):
                     break
         return res  # noqa
 
-    def get_xyz(self, first_ele, second_ele, from_ele=None, layer=3, timeout=1, error_type='raise'):
+    def get_xyz(self, first_ele, second_ele, from_ele=None, layer=3, start_layer=0, timeout=1, error_type='raise'):
         """
         获取血(x)缘(y)关系最(z)近的元素
         :return:
@@ -169,7 +169,10 @@ class DpRpaBase(RPAControl):
             if error_type == 'raise':
                 raise ValueError(f'未找到元素: {first_ele}')
             return None
-        p = fe
+        if start_layer:
+            p = fe.parent(start_layer)
+        else:
+            p = fe
         for _ in range(layer):
             p = p.parent()
             if se := p.ele(second_ele, timeout=timeout):
